@@ -251,7 +251,6 @@ function pages(options, callback) {
       // req.page.ancestors[0].areas are NOT loaded. If you need some of 
       // the items associated with ancestors or descendants, use a 
       // load handler to fetch them.
-      //
 
       function relatives(callback) {
         async.series([
