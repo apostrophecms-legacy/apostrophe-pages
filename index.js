@@ -1,24 +1,31 @@
 var async = require('async');
 var _ = require('underscore');
+RegExp.quote = require('regexp-quote');
 
-module.exports = function(options) {
-  return new pages(options);
+module.exports = function(options, callback) {
+  return new pages(options, callback);
 };
 
-function pages(options) {
+function pages(options, callback) {
   var apos = options.apos;
   var app = options.app;
   var self = this;
   
+  if (options.ui === undefined) {
+    options.ui = true;
+  }
+
   // Make sure that aposScripts and aposStylesheets summon our
   // browser-side UI assets for managing pages
 
-  apos.scripts.push('/apos-rss/js/rss.js');
+  if (options.ui) {
+    apos.scripts.push('/apos-pages/js/rss.js');
 
-  apos.stylesheets.push('/apos-rss/css/rss.css');
+    apos.stylesheets.push('/apos-pages/css/rss.css');
 
-  // Serve our assets
-  app.get('/apos-pages/*', apos.static(__dirname + '/public'));
+    // Serve our assets
+    app.get('/apos-pages/*', apos.static(__dirname + '/public'));
+  }
 
   // Usage: app.get('*', pages.serve({ templatePath: __dirname + '/views/pages' }))
   //
@@ -104,7 +111,7 @@ function pages(options) {
     return function(req, res) {
 
       req.extraPages = {};
-      return async.series([page, permissions, load], main);
+      return async.series([page, permissions, relatives, load], main);
 
       function page(callback) {
         // Get content for this page
@@ -112,7 +119,6 @@ function pages(options) {
         if ((!req.slug.length) || (req.slug.charAt(0) !== '/')) {
           req.slug = '/' + req.slug;
         }
-        console.log("SLUG IS " + req.slug);
         apos.getPage(req.slug, function(e, info) {
           if (e) {
             return callback(e);
@@ -125,12 +131,10 @@ function pages(options) {
           // Allow a callback for supplying nonexistent pages dynamically
           // (apostrophe-wiki uses this)
           if ((!req.page) && options.notfound) {
-            console.log('NOT FOUND');
             return options.notfound(req, function(err) {
               return callback(err);
             });
           } else {
-            console.log('FOUND');
             return callback(null);
           }
         });
@@ -146,7 +150,6 @@ function pages(options) {
         async.series([checkView, checkEdit], callback);
 
         function checkView(callback) {
-          console.log(callback);
           return apos.permissions(req, 'view-page', req.page, function(err) {
             // If there is a permissions error then note that we are not
             // cool enough to see the page, which triggers the appropriate
@@ -163,7 +166,6 @@ function pages(options) {
         }
 
         function checkEdit(callback) {
-          console.log(callback);
           return apos.permissions(req, 'edit-page', req.page, function(err) {
             // If there is no permissions error then note that we are cool
             // enough to edit the page
@@ -176,9 +178,6 @@ function pages(options) {
       function load(callback) {
         // Get any shared pages like global footers, also
         // invoke load callbacks if needed
-
-        console.log('REQ.PAGE IN LOAD:');
-        console.log(req.page);
 
         var load = options.load ? options.load : [];
 
@@ -197,13 +196,10 @@ function pages(options) {
         load = load.map(function(item) {
           if (typeof(item) !== 'function') {
             return function(callback) {
-              console.log('generated callback for ' + item);
               apos.getPage(item, function(err, page) {
                 if (err) {
-                  console.log('didn\'t work');
                   return callback(err);
                 }
-                console.log('worked');
                 // Provide an object with an empty areas property if
                 // the page doesn't exist yet. This simplifies templates
                 req.extraPages[item] = page ? page : { areas: [] }
@@ -222,9 +218,59 @@ function pages(options) {
         return async.parallel(load, callback);
       }
 
+      // Pages may have a path, separate from their slug, which expresses
+      // their relationship to other pages. The path looks like 
+      // this:
+      //
+      // home
+      // home/about
+      // home/about/staff
+      //
+      // The path always reflects the relationship between the pages no
+      // matter what the slug may be edited to (clients routinely shorten
+      // slugs but don't want to lose the relationships among pages).
+      //
+      // Note that paths do not have a leading /. 
+      //
+      // Pages also have a rank, which determines their ordering among
+      // the children of a particular page.
+      // 
+      // When a page with a path is served, apostrophe-pages loads the
+      // ancestors of that page into req.page.ancestors, in order
+      // (root page first). 
+      //
+      // apostrophe-pages also loads the children of that page into
+      // req.page.children, in order by rank. If options.depth
+      // is greater than 1, the children of the subpages are loaded into
+      // req.page.children[0].children, et cetera. options.depth
+      // defaults to 1.
+      //
+      // Note that multiple roots are permitted by this structure.
+      //
+      // For performance reasons, req.page.children[0].areas and
+      // req.page.ancestors[0].areas are NOT loaded. If you need some of 
+      // the items associated with ancestors or descendants, use a 
+      // load handler to fetch them.
+      //
+
+      function relatives(callback) {
+        async.series([
+          function(callback) { 
+            return self.getAncestors(page, options, function(err, ancestors) {
+              req.page.ancestors = ancestors;
+              return callback(err);
+            });
+          },
+          function(callback) { 
+            return self.getDescendants(page, options, function(err, children) {
+              req.page.children = children;
+              return callback(err);
+            });
+          }
+        ], callback);
+      }
+
       function main(err) {
-        console.log('REQ.PAGE IN MAIN:');
-        console.log(req.page);
         var template;
         var providePage = true;
         // Rendering errors isn't much different from
@@ -252,7 +298,6 @@ function pages(options) {
           // Supply a default template name
           template = 'default';
         }
-        console.log('providePage: ' + providePage);
         
         var args = {
           edit: req.edit,
@@ -264,9 +309,6 @@ function pages(options) {
         };
 
         _.defaults(args, req.extraPages);
-
-        console.log('ARGS ARE:');
-        console.log(args);
         
         var path = __dirname + '/views/' + template + '.html';
         if (options.templatePath) {
@@ -281,4 +323,84 @@ function pages(options) {
       }
     }
   }
+
+  // You can also call with just the page and callback arguments
+  self.getAncestors = function(page, options, callback) {
+    if (!callback) {
+      callback = options;
+      options = {};
+    }
+    var paths = [];
+    if (page.path) {
+      var components = page.path.split('/');
+      var path = '';
+      _.each(components, function(component) {
+        path += component;
+        // Don't redundantly load ourselves
+        if (path === page.path) {
+          return;
+        }
+        paths.push(path);
+        path += '/';
+      });
+      // Get everything about the related pages except
+      // for their actual items, which would be expensive.
+      // Sorting by path works because longer strings sort
+      // later than shorter prefixes
+      return apos.pages.find({ path: { $in: paths } }, { items: 0 }).sort( { path: 1 }).toArray(function(err, pages) {
+        if (err) {
+          return callback(err);
+        }
+        return callback(null, pages);
+      });
+    }
+    return callback(null); 
+  };
+
+  // You may skip the options parameter and pass just page and callback
+  self.getDescendants = function(page, options, callback) {
+    if (!callback) {
+      callback = options;
+      options = {};
+    }
+
+    var depth = options.depth;
+    // Careful, let them specify a depth of 0 but still have a good default
+    if (depth === undefined) {
+      depth = 1;
+    }
+
+    apos.pages.find(
+      { 
+        path: new RegExp('^' + RegExp.quote(page.path + '/')), 
+        level: { $gt: page.level, $lte: page.level + depth } 
+      }, 
+      { items: 0 }
+    ).
+    sort( { level: 1, rank: 1 } ).
+    toArray(function(err, pages) {
+      if (err) {
+        return callback(err);
+      }
+      var children = [];
+      var pagesByPath = {};
+      _.each(pages, function(page) {
+        page.children = [];
+        pagesByPath[page.path] = page;
+        var last = page.path.lastIndexOf('/');
+        var parentPath = page.path.substr(0, last);
+        if (pagesByPath[parentPath]) {
+          pagesByPath[parentPath].children.push(page);
+        } else {
+          children.push(page);
+        }
+      });
+      return callback(null, children);
+    });
+  };
+
+  // Unique and sparse together mean that many pages can have no path,
+  // but any paths that do exist must be unique
+
+  apos.pages.ensureIndex({ path: 1 }, { unique: true, sparse: true }, callback);
 }
