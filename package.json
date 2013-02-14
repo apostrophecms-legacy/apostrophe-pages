@@ -1,0 +1,27 @@
+{
+  "name": "apostrophe-pages",
+  "version": "0.0.1",
+  "description": "Adds trees of pages to the Apostrophe content management system",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/punkave/apostrophe-pages.git"
+  },
+  "keywords": [
+    "apostrophe",
+    "pages",
+    "cms",
+    "content management",
+    "content management system"
+  ],
+  "author": "P'unk Avenue punkave.com",
+  "license": "MIT",
+  "dependencies": {
+    "async": "~0.2.5",
+    "underscore": "~1.4.4"
+  },
+  "devDependencies": {}
+}
