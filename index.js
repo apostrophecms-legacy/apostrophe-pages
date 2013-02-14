@@ -197,11 +197,16 @@ function pages(options) {
         load = load.map(function(item) {
           if (typeof(item) !== 'function') {
             return function(callback) {
+              console.log('generated callback for ' + item);
               apos.getPage(item, function(err, page) {
                 if (err) {
+                  console.log('didn\'t work');
                   return callback(err);
                 }
-                req.extraPages[item] = page;
+                console.log('worked');
+                // Provide an object with an empty areas property if
+                // the page doesn't exist yet. This simplifies templates
+                req.extraPages[item] = page ? page : { areas: [] }
                 return callback(null);
               });
             }
