@@ -19,13 +19,176 @@ function pages(options, callback) {
   // browser-side UI assets for managing pages
 
   if (options.ui) {
-    apos.scripts.push('/apos-pages/js/rss.js');
+    apos.scripts.push('/apos-pages/js/pages.js');
 
-    apos.stylesheets.push('/apos-pages/css/rss.css');
+    apos.stylesheets.push('/apos-pages/css/pages.css');
 
-    // Serve our assets
+    apos.templates.push(__dirname + '/views/newPageSettings');
+    apos.templates.push(__dirname + '/views/editPageSettings');
+
+    app.post('/apos-pages/new', function(req, res) {
+      async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
+
+      var parent;
+      var page;
+      var parentSlug;
+      var title;
+      var nextRank;
+
+      function getParent(callback) {
+        parentSlug = req.body.parent;
+        title = req.body.title;
+        return apos.getPage(parentSlug, function(err, parentArg) {
+          parent = parentArg;
+          if ((!err) && (!parent)) {
+            err = 'Bad parent';
+          }
+          return callback(err);
+        });
+      }
+
+      function permissions(callback) {
+        return apos.permissions(req, 'add-page', parent, function(err) {
+          // If there is no permissions error then note that we are cool
+          // enough to edit the page
+          return callback(err);
+        });
+      }
+
+
+      // TODO: there's a potential race condition here. It's not a huge deal,
+      // having two pages with the same rank just leads to them sorting
+      // randomly, the page tree is not destroyed. But we should have a 
+      // cleanup task or a lock mechanism
+      function getNextRank(callback) {
+        console.log(parent);
+        self.getDescendants(parent, { depth: 1}, function(err, children) {
+          console.log(err);
+          console.log(children);
+          if (err) {
+            return callback(err);
+          }
+          nextRank = 1;
+          nextRank = _.reduce(children, function(memo, child) {
+            if (child.rank >= memo) {
+              memo = child.rank + 1;
+            }
+            return memo;
+          }, nextRank);
+          return callback(null);
+        });
+      }
+
+      function insertPage(callback) {
+        page = { title: title, level: parent.level + 1, areas: [], path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+        function insertAttempt() {
+          apos.pages.insert(page, function(err, doc) {
+            if (err) {
+              if ((err.code === 11000) && ((err.err.indexOf('slug') !== -1) || (err.err.indexOf('path') !== -1)))
+              {
+                var num = (Math.floor(Math.random() * 10)).toString();
+                page.slug += num;
+                page.path += num;
+                return insertAttempt();
+              }
+              res.statusCode = 500;
+              return res.send('error');
+            }
+            return callback(null, doc);
+          });
+        }
+        return insertAttempt();
+      }
+
+      function addSlashIfNeeded(path) {
+        path += '/';
+        path = path.replace('//', '/');
+        return path;
+      }
+
+      function sendPage(err) {
+        if (err) {
+          res.statusCode = 500;
+          return res.send('error');
+        }
+        return res.send(JSON.stringify(page));
+      }
+    });
+
+    app.post('/apos-pages/delete', function(req, res) {
+
+      async.series([ getPage, permissions, getParent, checkChildren, deletePage], respond);
+
+      var parent;
+      var page;
+      var parentSlug;
+      var title;
+      var nextRank;
+
+      function getPage(callback) {
+        pageSlug = req.body.slug;
+        return apos.getPage(pageSlug, function(err, pageArg) {
+          page = pageArg;
+          if(!page) {
+            return callback('Not Found');
+          }
+          return callback(err);
+        });
+      }
+
+      function permissions(callback) {
+        return apos.permissions(req, 'add-page', parent, function(err) {
+          // If there is no permissions error then note that we are cool
+          // enough to edit the page
+          return callback(err);
+        });
+      }
+
+      function getParent(callback) {
+        self.getAncestors(page, {}, function(err, ancestors) {
+          if(!ancestors.length) {
+            return callback('Cannot remove home page');
+          }
+          parent = ancestors.pop();
+          return callback(err);
+        });
+      }
+
+      function checkChildren(callback) {
+        self.getDescendants(page, {depth: 1}, function(err, descendants) {
+          if(descendants.length) {
+            return callback('Remove child pages first');
+          }
+          return callback(err);
+        });
+      }
+
+      function deletePage(callback) {
+        apos.pages.remove({slug: page.slug}, callback);
+      }
+
+      function respond(err) {
+        if (err) {
+          return res.send(JSON.stringify({
+            status: err
+          }));
+        }
+        return res.send(JSON.stringify({
+          status: 'ok',
+          parent: parent.slug
+        }));
+      }
+    });
+
+    // Serve our assets. This is the final route so it doesn't
+    // beat out the rest
     app.get('/apos-pages/*', apos.static(__dirname + '/public'));
+
+    apos.addLocal('aposEditPage', function(page, edit) {
+      return apos.partial('editPage.html', { page: page, edit: edit}, __dirname + '/views');
+    });
   }
+
 
   // Usage: app.get('*', pages.serve({ templatePath: __dirname + '/views/pages' }))
   //
@@ -108,6 +271,14 @@ function pages(options, callback) {
   // template property, 'default' is assumed.
 
   self.serve = function(options) {
+
+    if(!options) {
+      options = {};
+    }
+    _.defaults(options, {
+      root: ''
+    });
+
     return function(req, res) {
 
       req.extraPages = {};
@@ -127,6 +298,10 @@ function pages(options, callback) {
           // and send the 404 template. We still want to load all
           // the global stuff first
           req.page = info;
+
+          if (req.page) {
+            req.page.url = options.root + req.page.slug;
+          }
 
           // Allow a callback for supplying nonexistent pages dynamically
           // (apostrophe-wiki uses this)
@@ -218,50 +393,20 @@ function pages(options, callback) {
         return async.parallel(load, callback);
       }
 
-      // Pages may have a path, separate from their slug, which expresses
-      // their relationship to other pages. The path looks like 
-      // this:
-      //
-      // home
-      // home/about
-      // home/about/staff
-      //
-      // The path always reflects the relationship between the pages no
-      // matter what the slug may be edited to (clients routinely shorten
-      // slugs but don't want to lose the relationships among pages).
-      //
-      // Note that paths do not have a leading /. 
-      //
-      // Pages also have a rank, which determines their ordering among
-      // the children of a particular page.
-      // 
-      // When a page with a path is served, apostrophe-pages loads the
-      // ancestors of that page into req.page.ancestors, in order
-      // (root page first). 
-      //
-      // apostrophe-pages also loads the children of that page into
-      // req.page.children, in order by rank. If options.depth
-      // is greater than 1, the children of the subpages are loaded into
-      // req.page.children[0].children, et cetera. options.depth
-      // defaults to 1.
-      //
-      // Note that multiple roots are permitted by this structure.
-      //
-      // For performance reasons, req.page.children[0].areas and
-      // req.page.ancestors[0].areas are NOT loaded. If you need some of 
-      // the items associated with ancestors or descendants, use a 
-      // load handler to fetch them.
-
       function relatives(callback) {
+        console.log(req.page);
+        if(!req.page) {
+          return callback(null);
+        }
         async.series([
           function(callback) { 
-            return self.getAncestors(page, options, function(err, ancestors) {
+            return self.getAncestors(req.page, options, function(err, ancestors) {
               req.page.ancestors = ancestors;
               return callback(err);
             });
           },
           function(callback) { 
-            return self.getDescendants(page, options, function(err, children) {
+            return self.getDescendants(req.page, options, function(err, children) {
               req.page.children = children;
               return callback(err);
             });
@@ -329,6 +474,13 @@ function pages(options, callback) {
       callback = options;
       options = {};
     }
+    if(!options) {
+      options = {};
+    }
+    _.defaults(options, {
+      root: ''
+    });
+
     var paths = [];
     if (page.path) {
       var components = page.path.split('/');
@@ -350,6 +502,9 @@ function pages(options, callback) {
         if (err) {
           return callback(err);
         }
+        _.each(pages, function(page) {
+          page.url = options.root + page.slug;
+        })
         return callback(null, pages);
       });
     }
@@ -362,6 +517,13 @@ function pages(options, callback) {
       callback = options;
       options = {};
     }
+    if(!options) {
+      options = {};
+    }
+    _.defaults(options, {
+      root: ''
+    });
+
 
     var depth = options.depth;
     // Careful, let them specify a depth of 0 but still have a good default
@@ -385,6 +547,7 @@ function pages(options, callback) {
       var pagesByPath = {};
       _.each(pages, function(page) {
         page.children = [];
+        page.url = options.root + page.slug;
         pagesByPath[page.path] = page;
         var last = page.path.lastIndexOf('/');
         var parentPath = page.path.substr(0, last);
