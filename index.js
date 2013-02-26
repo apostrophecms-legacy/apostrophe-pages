@@ -37,7 +37,11 @@ function pages(options, callback) {
 
       function getParent(callback) {
         parentSlug = req.body.parent;
-        title = req.body.title;
+        title = req.body.title.trim();
+        // Validation is annoying, automatic cleanup is awesome
+        if (!title.length) {
+          title = 'New Page';
+        }
         return apos.getPage(parentSlug, function(err, parentArg) {
           parent = parentArg;
           if ((!err) && (!parent)) {

@@ -31,9 +31,9 @@ aposPages.enableUI = function(options) {
             }
           }
         );
-        return false;
       }
     });
+    return false;
   });
   $('body').on('click', '.apos-delete-page', function(){
     var slug = $(this).data('slug');
