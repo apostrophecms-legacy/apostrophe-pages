@@ -27,6 +27,13 @@ function pages(options, callback) {
     apos.templates.push(__dirname + '/views/editPageSettings');
 
     app.post('/apos-pages/new', function(req, res) {
+
+      title = req.body.title.trim();
+      // Validation is annoying, automatic cleanup is awesome
+      if (!title.length) {
+        title = 'New Page';
+      }
+
       async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
 
       var parent;
@@ -37,11 +44,6 @@ function pages(options, callback) {
 
       function getParent(callback) {
         parentSlug = req.body.parent;
-        title = req.body.title.trim();
-        // Validation is annoying, automatic cleanup is awesome
-        if (!title.length) {
-          title = 'New Page';
-        }
         return apos.getPage(parentSlug, function(err, parentArg) {
           parent = parentArg;
           if ((!err) && (!parent)) {
@@ -108,6 +110,116 @@ function pages(options, callback) {
         path += '/';
         path = path.replace('//', '/');
         return path;
+      }
+
+      function sendPage(err) {
+        if (err) {
+          res.statusCode = 500;
+          return res.send('error');
+        }
+        return res.send(JSON.stringify(page));
+      }
+    });
+
+    app.post('/apos-pages/edit', function(req, res) {
+
+      var page;
+      var originalSlug;
+      var slug;
+      var title;
+      var nextRank;
+
+      title = req.body.title.trim();
+      // Validation is annoying, automatic cleanup is awesome
+      if (!title.length) {
+        title = 'Untitled Page';
+      }
+      originalSlug = req.body.originalSlug;
+      slug = req.body.slug;
+
+      // Make sure they don't turn it into a virtual page
+      if (!slug.match(/^\//)) {
+        slug = '/' + slug;
+      }
+
+      async.series([ getPage, permissions, updatePage, updateDescendants ], sendPage);
+
+
+      function getPage(callback) {
+
+        return apos.getPage(originalSlug, function(err, pageArg) {
+          page = pageArg;
+          if ((!err) && (!page)) {
+            err = 'Bad page';
+          }
+          return callback(err);
+        });
+      }
+
+      function permissions(callback) {
+        return apos.permissions(req, 'edit', page, function(err) {
+          // If there is no permissions error then note that we are cool
+          // enough to edit the page
+          return callback(err);
+        });
+      }
+
+      function updatePage(callback) {
+        page.title = title;
+        page.slug = slug;
+
+        // TODO refactor to eliminate redundancy here and in insertAttempt. Maybe.
+        // They are complex enough that they might be better off separate
+
+        function updateAttempt() {
+          apos.pages.update({ slug: originalSlug }, page, function(err, result) {
+            if (err) {
+              if ((err.code === 11000) && (err.err.indexOf('slug') !== -1))
+              {
+                var num = (Math.floor(Math.random() * 10)).toString();
+                page.slug += num;
+                return updateAttempt();
+              }
+              res.statusCode = 500;
+              return res.send('error');
+            }
+            slug = page.slug;
+            return callback(null, result);
+          });
+        }
+        return updateAttempt();
+      }
+
+      // If our slug changed, then our descendants' slugs should
+      // also change, if they are still similar. You can't do a 
+      // global substring replace in MongoDB the way you can
+      // in MySQL, so we need to fetch them and update them 
+      // individually. async.mapSeries is a good choice because
+      // there may be zillions of descendants and we don't want
+      // to choke the server. We could use async.mapLimit, but
+      // let's not get fancy just yet
+
+      function updateDescendants(callback) {
+        console.log('updateDescendants');
+        if (originalSlug === slug) {
+          console.log('no change');
+          return callback(null);
+        }
+        var matchParentSlugPrefix = new RegExp('^' + RegExp.quote(originalSlug + '/'));
+        apos.pages.find({ slug: matchParentSlugPrefix }, { items: 0 }).toArray(function(err, descendants) {
+          console.log('COUNT of descendants found: ');
+          console.log(descendants.length);
+          if (err) {
+            return callback(err);
+          }
+          console.log(descendants);
+          var newSlugPrefix = slug + '/';
+          async.mapSeries(descendants, function(descendant, callback) {
+            console.log('fixing ' + descendant.slug);
+            var newSlug = descendant.slug.replace(matchParentSlugPrefix, newSlugPrefix);
+            return apos.pages.update({ slug: descendant.slug }, { $set: { slug: newSlug } }, callback);
+          }, callback);
+        }); 
       }
 
       function sendPage(err) {
