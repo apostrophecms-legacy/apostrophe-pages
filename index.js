@@ -9,11 +9,20 @@ module.exports = function(options, callback) {
 function pages(options, callback) {
   var apos = options.apos;
   var app = options.app;
-  var self = this;
+  var aposPages = self = this;
+
+  if (!options.types) {
+    options.types = [ { name: 'default', label: 'Default' } ];
+  }
   
+  console.log(options.types);
+
   if (options.ui === undefined) {
     options.ui = true;
   }
+
+  // For visibility in other scopes
+  aposPages.options = options;
 
   // Make sure that aposScripts and aposStylesheets summon our
   // browser-side UI assets for managing pages
@@ -27,6 +36,12 @@ function pages(options, callback) {
     apos.templates.push(__dirname + '/views/editPageSettings');
 
     app.post('/apos-pages/new', function(req, res) {
+      var parent;
+      var page;
+      var parentSlug;
+      var title;
+      var type;
+      var nextRank;
 
       title = req.body.title.trim();
       // Validation is annoying, automatic cleanup is awesome
@@ -34,13 +49,14 @@ function pages(options, callback) {
         title = 'New Page';
       }
 
-      async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
+      type = req.body.type;
+      if (!_.some(aposPages.options.types, function(item) {
+        return item.name === type;
+      })) {
+        type = 'default';
+      }
 
-      var parent;
-      var page;
-      var parentSlug;
-      var title;
-      var nextRank;
+      async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
 
       function getParent(callback) {
         parentSlug = req.body.parent;
@@ -86,7 +102,7 @@ function pages(options, callback) {
       }
 
       function insertPage(callback) {
-        page = { title: title, level: parent.level + 1, areas: [], path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+        page = { title: title, type: type, level: parent.level + 1, areas: [], path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
         function insertAttempt() {
           apos.pages.insert(page, function(err, doc) {
             if (err) {
@@ -127,13 +143,21 @@ function pages(options, callback) {
       var originalSlug;
       var slug;
       var title;
-      var nextRank;
+      var type;
 
       title = req.body.title.trim();
       // Validation is annoying, automatic cleanup is awesome
       if (!title.length) {
         title = 'Untitled Page';
       }
+
+      type = req.body.type;
+      if (!_.some(aposPages.options.types, function(item) {
+        return item.name === type;
+      })) {
+        type = 'default';
+      }
+
       originalSlug = req.body.originalSlug;
       slug = req.body.slug;
 
@@ -167,6 +191,7 @@ function pages(options, callback) {
       function updatePage(callback) {
         page.title = title;
         page.slug = slug;
+        page.type = type;
 
         // TODO refactor to eliminate redundancy here and in insertAttempt. Maybe.
         // They are complex enough that they might be better off separate
@@ -300,13 +325,19 @@ function pages(options, callback) {
     // beat out the rest
     app.get('/apos-pages/*', apos.static(__dirname + '/public'));
 
-    apos.addLocal('aposEditPage', function(page, edit) {
-      return apos.partial('editPage.html', { page: page, edit: edit}, __dirname + '/views');
+    apos.addLocal('aposEditPage', function(options) {
+      if (!options.root) {
+        options.root = '/';
+      }      
+      if (!options.types) {
+        options.types = aposPages.options.types;
+      }
+      return apos.partial('editPage.html', options, __dirname + '/views');
     });
   }
 
 
-  // Usage: app.get('*', pages.serve({ templatePath: __dirname + '/views/pages' }))
+  // Usage: app.get('*', pages.serve({ typePath: __dirname + '/views/pages' }))
   //
   // If you use this global wildcard route, make it your LAST route,
   // as otherwise it overrides everything else.
@@ -321,7 +352,7 @@ function pages(options, callback) {
   // self.serve will automatically prepend a / to the slug if 
   // req.params[0] does not contain one.
   //
-  // The page object is passed to the Nunjucks template as `page`. 
+  // The page object is passed to the Nunjucks type as `page`. 
   //
   // If you want to also load all areas on the "global" page, for instance
   // to fetch shared headers and footers used across a site, supply a
@@ -330,8 +361,8 @@ function pages(options, callback) {
   // app.get('/pages/*', pages.serve({ load: [ 'global' ] }, ...))
   //
   // The page with the slug `global` then becomes visible to the Nunjucks 
-  // template as `global`. Note that it may not exist yet, in which case
-  // `global` is not set. Your template code must allow for this.
+  // type as `global`. Note that it may not exist yet, in which case
+  // `global` is not set. Your type code must allow for this.
   // 
   // You can include functions in the load: array. If you do so, those
   // functions are invoked as callbacks, and receive 'req' as their first
@@ -345,23 +376,23 @@ function pages(options, callback) {
   // It is is also acceptable to pass a single function rather than an 
   // array as the `load` property.
   //
-  // The template name used to render the page is taken from
-  // the template property of the page object. You will need to set the
-  // directory from which page templates are loaded:
+  // The type name used to render the page is taken from
+  // the type property of the page object. You will need to set the
+  // directory from which page type templates are loaded:
   //
-  // app.get('*', pages.serve({ templatePath: __dirname + '/views/pages' })
+  // app.get('*', pages.serve({ typePath: __dirname + '/views/pages' })
   //
-  // You can also override individual template paths. Any paths you don't
-  // override continue to respect templatePath. Note that you are still 
-  // specifying a folder's path, which must contain a nunjucks template 
-  // named home.html to render a page with that template property:
+  // You can also override individual type paths. Any paths you don't
+  // override continue to respect typePath. Note that you are still 
+  // specifying a folder's path, which must contain a nunjucks type 
+  // named home.html to render a page with that type property:
   //
-  // app.get('*', pages.serve({ ..., templatePaths: { home: __dirname + '/views/pages' } })
+  // app.get('*', pages.serve({ ..., typePaths: { home: __dirname + '/views/pages' } })
   //
-  // In the event the page slug requested is not found, the notfound template 
-  // is rendered. You can override the notfound template path like any other.
+  // In the event the page slug requested is not found, the notfound type 
+  // is rendered. You can override the notfound type path like any other.
   //
-  // Page templates will want to render areas, passing along the slug and the
+  // Page type templates will want to render areas, passing along the slug and the
   // edit permission flag:
   //
   // {{ aposArea({ slug: slug + ':main', area: page.main, edit: edit }) }}
@@ -384,7 +415,7 @@ function pages(options, callback) {
   //
   // If you do not set req.page the normal page-not-found behavior is applied. 
   // Make sure you specify at least an areas property. If you do not supply a
-  // template property, 'default' is assumed.
+  // type property, 'default' is assumed.
 
   self.serve = function(options) {
 
@@ -411,7 +442,7 @@ function pages(options, callback) {
             return callback(e);
           }
           // "What if there is no page?" We'll note that later
-          // and send the 404 template. We still want to load all
+          // and send the 404 type. We still want to load all
           // the global stuff first
           req.page = info;
 
@@ -444,7 +475,7 @@ function pages(options, callback) {
           return apos.permissions(req, 'view-page', req.page, function(err) {
             // If there is a permissions error then note that we are not
             // cool enough to see the page, which triggers the appropriate
-            // error template. 
+            // error type. 
             if (err) {
               if (req.user) {
                 req.insufficient = true;
@@ -492,7 +523,7 @@ function pages(options, callback) {
                   return callback(err);
                 }
                 // Provide an object with an empty areas property if
-                // the page doesn't exist yet. This simplifies templates
+                // the page doesn't exist yet. This simplifies page type templates
                 req.extraPages[item] = page ? page : { areas: [] }
                 return callback(null);
               });
@@ -531,32 +562,38 @@ function pages(options, callback) {
       }
 
       function main(err) {
-        var template;
+        var type;
         var providePage = true;
         // Rendering errors isn't much different from
         // rendering other stuff. We still get access
         // to shared stuff loaded via `load`.
         if (err) {
-          template = 'serverError';
+          type = 'serverError';
           res.statusCode = 500;
           providePage = false;
         } else if (req.loginRequired) {
-          template = 'loginRequired';
+          type = 'loginRequired';
           providePage = false;
         } else if (req.insufficient) {
-          template = 'insufficient';
+          type = 'insufficient';
           providePage = false;
         } else if (req.page) {
-          template = req.page.template;
+          // Make sure the type is allowed
+          type = req.page.type;
+          if (!_.some(aposPages.options.types, function(item) {
+            return item.name === type;
+          })) {
+            type = 'default';
+          }
         } else {
           res.statusCode = 404;
-          template = 'notfound';
+          type = 'notfound';
           providePage = false;
         }
 
-        if (template === undefined) {
-          // Supply a default template name
-          template = 'default';
+        if (type === undefined) {
+          // Supply a default type name
+          type = 'default';
         }
         
         var args = {
@@ -570,13 +607,13 @@ function pages(options, callback) {
 
         _.defaults(args, req.extraPages);
         
-        var path = __dirname + '/views/' + template + '.html';
+        var path = __dirname + '/views/' + type + '.html';
         if (options.templatePath) {
-          path = options.templatePath + '/' + template + '.html';
+          path = options.templatePath + '/' + type + '.html';
         }
         if (options.templatePaths) {
-          if (options.templatePaths[template]) {
-            path = options.templatePaths[template] + '/' + req.page.template + '.html';
+          if (options.templatePaths[type]) {
+            path = options.templatePaths[type] + '/' + req.page.type + '.html';
           }
         }
         return res.send(apos.partial(path, args));

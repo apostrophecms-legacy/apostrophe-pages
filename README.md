@@ -21,6 +21,12 @@ Setting up `apostrophe-pages` is easy once you have the main `apos` object. See 
 
 Notice that we set partialPaths to provide global layout templates that can be `extend`ed by our page templates, and set `templatePath` to specify where our page templates area.
 
+If you do not specify a `types` parameter when initializing the module, a default page template name, `default.html`, is looked for. You can specify a list of page types instead:
+
+    types: [ { name: 'default', label: 'Default (Two Column)' }, { name: 'onecolumn', label: 'One Column' }]
+
+In the future it will be possible to pass functions here that extend the capabilities of particular page types beyond serving standard Apostrophe content, similar to the "engines" feature in Apostrophe 1.5.
+
 `pages.serve` has options that can be used to override its behavior in many ways. Complete documentation for the `pages.serve` function is provided at the top of the function in `index.js` (TODO: work on publishing this as jsdoc).
 
 Your page templates will want to render areas. Just use the page objects passed to you to access them and call the aposArea helper available in anything rendered via apos.partial, which includes page templates:

@@ -15,6 +15,10 @@ aposPages.enableUI = function(options) {
   $('body').on('click', '.apos-new-page', function() {
     var parent = $(this).data('slug');
     var $el = apos.modalFromTemplate('.apos-new-page-settings', {
+      init: function(callback) {
+        populateType($el);
+        return callback(null);
+      },
       save: save
     });
     function save(callback) {
@@ -28,6 +32,8 @@ aposPages.enableUI = function(options) {
     var $el = apos.modalFromTemplate('.apos-edit-page-settings', {
       save: save,
       init: function(callback) {
+        populateType($el);
+        $el.find('[name=type]').val(aposPages.options.type);
         $el.find('[name=title]').val(aposPages.options.title);
         $el.find('[name=slug]').val(slug);
         return callback(null);
@@ -39,6 +45,17 @@ aposPages.enableUI = function(options) {
     return false;
   });
 
+  function populateType($el) {
+    var $type = $el.find('[name=type]');
+    $type.html('');
+    _.each(aposPages.options.types, function(type) {
+      var $option = $('<option></option>');
+      $option.text(type.label);
+      $option.attr('value', type.name);
+      $type.append($option);
+    });
+  }
+
   function addOrEdit($el, action, options, callback) {
     $.ajax(
       { 
@@ -46,6 +63,7 @@ aposPages.enableUI = function(options) {
         data: {
           title: $el.find('[name="title"]').val(),
           slug: $el.find('[name="slug"]').val(),
+          type: $el.find('[name="type"]').val(),
           parent: options.parent,
           originalSlug: options.slug
         }, 

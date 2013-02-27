@@ -4,4 +4,7 @@
   <a data-slug="{{ page.slug | e }}" href="#" class="apos-control apos-button apos-edit-page" data-edit-page>Page Settings</a>
   <a data-slug="{{ page.slug | e }}" href="#" class="apos-control apos-button apos-delete-page" data-delete-page>Delete Page</a>
 </div>
+<script type="text/javascript">
+aposPages.enableUI({{ { root: '/', title: page.title, type: page.type, types: types } | json }});
+</script>
 {% endif %}
