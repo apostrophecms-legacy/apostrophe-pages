@@ -2,7 +2,7 @@
 
 `apostrophe-pages` adds page rendering to the [Apostrophe](http://github.com/punkave/apostrophe) content management system. The `apostrophe-pages` module makes it easy to serve pages, fetching the requested page and making its content areas available to your Nunjucks template along with any other attributes of interest.
 
-`apostrophe-pages` will soon also account for traditional "page trees," in which the "Staff" page is a child of the "About" page which is a child of the "Home" page, and provide a convenient interface for creating and managing pages.
+`apostrophe-pages` also provides a UI for adding pages, deleting pages and changing page settings such as the title. As part of that, `apostrophe-pages` provides functions to fetch ancestor and descendant pages to any desired depth.
 
 ## Serving Pages
 
