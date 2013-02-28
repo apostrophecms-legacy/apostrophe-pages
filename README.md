@@ -74,3 +74,14 @@ For performance reasons, `pages.getAncestors` and `pages.getDescendants` do not 
 
 `pages.serve` automatically fetches the ancestors of the page into the `ancestors` property of the `page` object given to the page template. In addition, the children of the page are available in the `children` property. If you specify `depth: 2` as an option to `pages.serve`, you may access the grandchildren as well. You may set `depth` as high as your needs require, but for performance reasons it's best not to fetch more detail than you need.
 
+## User Interface: Adding, Modifying and Removing Pages ##
+
+`apostrophe-pages` provides a full user interface for creating, modifying and removing pages. To enable it, just insert the appropriate markup into your page layout:
+
+    {{ aposEditPage({ page: page, edit: edit, root: '/' }) }}
+
+This helper function inserts the page-related buttons at that point and also the necessary browser-side JavaScript to power them.
+
+## Automatic Redirects ##
+
+If you change the slug (URL) of a page via the Page Settings button, that doesn't tell Google and other search engines that the page has moved. So as a convenience, `apostrophe-pages` automatically tracks the old URLs and provides redirects to the new URLs. Of course, if a new page is created at the old URL, that page wins and the old redirect is not used.

@@ -166,7 +166,7 @@ function pages(options, callback) {
         slug = '/' + slug;
       }
 
-      async.series([ getPage, permissions, updatePage, updateDescendants ], sendPage);
+      async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
 
 
       function getPage(callback) {
@@ -193,6 +193,10 @@ function pages(options, callback) {
         page.slug = slug;
         page.type = type;
 
+        if ((slug !== originalSlug) && (originalSlug === '/')) {
+          return callback('Cannot change the slug of the home page');          
+        }
+
         // TODO refactor to eliminate redundancy here and in insertAttempt. Maybe.
         // They are complex enough that they might be better off separate
 
@@ -213,6 +217,19 @@ function pages(options, callback) {
           });
         }
         return updateAttempt();
+      }
+
+      function redirect(callback) {
+        if (slug !== originalSlug) {
+          self.redirects.update(
+            { from: originalSlug },
+            { from: originalSlug, to: slug }, 
+            { upsert: true, safe: true }, 
+            function(err, doc) {
+              return callback(err);
+            }
+          );
+        }
       }
 
       // If our slug changed, then our descendants' slugs should
@@ -452,10 +469,22 @@ function pages(options, callback) {
 
           // Allow a callback for supplying nonexistent pages dynamically
           // (apostrophe-wiki uses this)
-          if ((!req.page) && options.notfound) {
-            return options.notfound(req, function(err) {
-              return callback(err);
-            });
+          if (!req.page) {
+            if (options.notfound) {
+              return options.notfound(req, function(err) {
+                return callback(err);
+              });
+            } else {
+            // Check for a redirect from an old slug before giving up
+              self.redirects.findOne({from: req.slug }, function(err, redirect) {
+                if (redirect) {
+                  console.log('Redirecting from old URL');
+                  return res.redirect(options.root + redirect.to);
+                } else {
+                  return callback(null);
+                }
+              });
+            }
           } else {
             return callback(null);
           }
@@ -714,8 +743,20 @@ function pages(options, callback) {
     });
   };
 
-  // Unique and sparse together mean that many pages can have no path,
-  // but any paths that do exist must be unique
+  async.series([ pathIndex, redirectInit ], callback);
 
-  apos.pages.ensureIndex({ path: 1 }, { unique: true, sparse: true }, callback);
+  function pathIndex(callback) {
+    // Unique and sparse together mean that many pages can have no path,
+    // but any paths that do exist must be unique
+    return apos.pages.ensureIndex({ path: 1 }, { safe: true, unique: true, sparse: true }, callback);
+  }
+
+  function redirectInit(callback) {
+    db.collection('aposRedirects', function(err, collection) {
+      self.redirects = collection;
+      collection.ensureIndex({ from: 1 }, { safe: true, unique: true }, function(err) {
+        return callback(err);
+      });
+    });
+  }
 }
