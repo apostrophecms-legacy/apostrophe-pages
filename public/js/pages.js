@@ -29,6 +29,7 @@ aposPages.enableUI = function(options) {
 
   $('body').on('click', '.apos-edit-page', function() {
     var slug = $(this).data('slug');
+    var interval;
     var $el = apos.modalFromTemplate('.apos-edit-page-settings', {
       save: save,
       init: function(callback) {
@@ -36,7 +37,39 @@ aposPages.enableUI = function(options) {
         $el.find('[name=type]').val(aposPages.options.type);
         $el.find('[name=title]').val(aposPages.options.title);
         $el.find('[name=slug]').val(slug);
+
+        // Watch the title for changes, update the slug - but only if
+        // the slug was in sync with the title to start with
+
+        var $slug = $el.find('[name=slug]');
+        var $title = $el.find('[name=title]');
+        var originalTitle = aposPages.options.title;
+        var currentSlug = $slug.val();
+        var components = currentSlug.split('/');
+        var currentSlugTitle = components.pop();
+        if (currentSlugTitle === apos.slugify(originalTitle)) {
+          apos.log('Slug was initially in sync with title');
+          $title.on('keyup', function() {
+            var title = $title.val();
+            if (title !== originalTitle) {
+              var currentSlug = $el.find('[name=slug]').val();
+              var components = currentSlug.split('/');
+              if (components.length) {
+                components.pop();
+                var candidateSlugTitle = apos.slugify(title);
+                components.push(candidateSlugTitle);
+                var newSlug = components.join('/');
+                $slug.val(newSlug);
+                apos.log("Auto-updated slug to " + newSlug);
+              }
+            }
+          });
+        }
         return callback(null);
+      },
+      afterHide: function(callback) {
+        clearInterval(interval);
+        return callback();
       }
     });
     function save(callback) {

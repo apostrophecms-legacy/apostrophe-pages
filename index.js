@@ -15,8 +15,6 @@ function pages(options, callback) {
     options.types = [ { name: 'default', label: 'Default' } ];
   }
   
-  console.log(options.types);
-
   if (options.ui === undefined) {
     options.ui = true;
   }
@@ -83,10 +81,7 @@ function pages(options, callback) {
       // randomly, the page tree is not destroyed. But we should have a 
       // cleanup task or a lock mechanism
       function getNextRank(callback) {
-        console.log(parent);
         self.getDescendants(parent, { depth: 1}, function(err, children) {
-          console.log(err);
-          console.log(children);
           if (err) {
             return callback(err);
           }
@@ -102,11 +97,11 @@ function pages(options, callback) {
       }
 
       function insertPage(callback) {
-        page = { title: title, type: type, level: parent.level + 1, areas: [], path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+        page = { title: title, type: type, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
         function insertAttempt() {
           apos.pages.insert(page, function(err, doc) {
             if (err) {
-              if ((err.code === 11000) && ((err.err.indexOf('slug') !== -1) || (err.err.indexOf('path') !== -1)))
+              if (apos.isUniqueError(err, slug) || apos.isUniqueError(err, path))
               {
                 var num = (Math.floor(Math.random() * 10)).toString();
                 page.slug += num;
@@ -161,10 +156,15 @@ function pages(options, callback) {
       originalSlug = req.body.originalSlug;
       slug = req.body.slug;
 
+      slug = apos.slugify(slug, { allowed: '/' });
       // Make sure they don't turn it into a virtual page
       if (!slug.match(/^\//)) {
         slug = '/' + slug;
       }
+      // Eliminate double slashes
+      slug = slug.replace(/\/+/g, '/');
+      // Eliminate trailing slashes
+      slug = slug.replace(/\/$/, '');
 
       async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
 
@@ -203,13 +203,14 @@ function pages(options, callback) {
         function updateAttempt() {
           apos.pages.update({ slug: originalSlug }, page, function(err, result) {
             if (err) {
-              if ((err.code === 11000) && (err.err.indexOf('slug') !== -1))
+              if (apos.isUniqueError(err, 'slug'))
               {
                 var num = (Math.floor(Math.random() * 10)).toString();
                 page.slug += num;
                 return updateAttempt();
               }
               res.statusCode = 500;
+              console.log(err);
               return res.send('error');
             }
             slug = page.slug;
@@ -226,10 +227,13 @@ function pages(options, callback) {
             { from: originalSlug, to: slug }, 
             { upsert: true, safe: true }, 
             function(err, doc) {
+              console.log('error in redirect');
+              console.log(err);
               return callback(err);
             }
           );
         }
+        return callback(null);
       }
 
       // If our slug changed, then our descendants' slugs should
@@ -242,22 +246,16 @@ function pages(options, callback) {
       // let's not get fancy just yet
 
       function updateDescendants(callback) {
-        console.log('updateDescendants');
         if (originalSlug === slug) {
-          console.log('no change');
           return callback(null);
         }
         var matchParentSlugPrefix = new RegExp('^' + RegExp.quote(originalSlug + '/'));
         apos.pages.find({ slug: matchParentSlugPrefix }, { items: 0 }).toArray(function(err, descendants) {
-          console.log('COUNT of descendants found: ');
-          console.log(descendants.length);
           if (err) {
             return callback(err);
           }
-          console.log(descendants);
           var newSlugPrefix = slug + '/';
           async.mapSeries(descendants, function(descendant, callback) {
-            console.log('fixing ' + descendant.slug);
             var newSlug = descendant.slug.replace(matchParentSlugPrefix, newSlugPrefix);
             return apos.pages.update({ slug: descendant.slug }, { $set: { slug: newSlug } }, callback);
           }, callback);
@@ -478,7 +476,6 @@ function pages(options, callback) {
             // Check for a redirect from an old slug before giving up
               self.redirects.findOne({from: req.slug }, function(err, redirect) {
                 if (redirect) {
-                  console.log('Redirecting from old URL');
                   return res.redirect(options.root + redirect.to);
                 } else {
                   return callback(null);
@@ -570,7 +567,6 @@ function pages(options, callback) {
       }
 
       function relatives(callback) {
-        console.log(req.page);
         if(!req.page) {
           return callback(null);
         }
