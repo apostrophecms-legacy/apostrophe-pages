@@ -382,10 +382,10 @@ function pages(options, callback) {
   // You can include functions in the load: array. If you do so, those
   // functions are invoked as callbacks, and receive 'req' as their first
   // parameter. They should add additional page objects as properties of the
-  // req.extraPages object, then invoke the callback they receive as their
+  // req.extras object, then invoke the callback they receive as their
   // second parameter with null, or with an error if they have failed in a
   // way that should result in a 500 error. All such extra pages are made 
-  // visible to Nunjucks. For instance, if you load req.extraPages.department, 
+  // visible to Nunjucks. For instance, if you load req.extras.department, 
   // then a variable named department containing that page is visible to Nunjucks.
   //
   // It is is also acceptable to pass a single function rather than an 
@@ -415,7 +415,7 @@ function pages(options, callback) {
   // {{ aposArea({ slug: 'global:footer', area: global.footer, edit: edit }) }}
   //
   // You can access all properties of the page via the 'page' object. Any pages
-  // added to extraPages by `load` callbacks are also visible, like `global` above.
+  // added to extras by `load` callbacks are also visible, like `global` above.
   //
   // If you want to create pages dynamically when nonexistent page slugs are visited,
   // you can supply a notfound handler:
@@ -443,7 +443,7 @@ function pages(options, callback) {
 
     return function(req, res) {
 
-      req.extraPages = {};
+      req.extras = {};
       return async.series([page, permissions, relatives, load], main);
 
       function page(callback) {
@@ -550,7 +550,7 @@ function pages(options, callback) {
                 }
                 // Provide an object with an empty areas property if
                 // the page doesn't exist yet. This simplifies page type templates
-                req.extraPages[item] = page ? page : { areas: [] }
+                req.extras[item] = page ? page : { areas: [] }
                 return callback(null);
               });
             }
@@ -630,7 +630,7 @@ function pages(options, callback) {
           user: req.user
         };
 
-        _.defaults(args, req.extraPages);
+        _.defaults(args, req.extras);
         
         var path = __dirname + '/views/' + type + '.html';
         if (options.templatePath) {
