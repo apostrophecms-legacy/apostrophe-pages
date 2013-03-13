@@ -21,11 +21,19 @@ Setting up `apostrophe-pages` is easy once you have the main `apos` object. See 
 
 Notice that we set partialPaths to provide global layout templates that can be `extend`ed by our page templates, and set `templatePath` to specify where our page templates area.
 
-If you do not specify a `types` parameter when initializing the module, a default page template name, `default.html`, is looked for. You can specify a list of page types instead:
+## Page Types and Page Type Groups
+
+The constructor for the pages module accepts a `types` option. In its simplest form, a "page type" is just a template name and a label. If you do not specify a `types` parameter, you get a single type with the name `default` and the label `Default`. this causes `views/default.html` to be loaded to render pages with that type.
+
+However page types can also be extended with custom behavior. See the `apostrophe-blog` module for an example with all the trimmings. The blog also depends on the groups feature, described next.
+
+To facilitate code reuse, page types can have a single "superclass" from which they inherit behavior in both the server- and browser-side JavaScript code. Thus you can add essentially the same page type with several labels ("Professional Blog," "Personal Blog") and several names, but set the "group" property to inherit behavior from any group you define with the `pages.addGroup` method or by passing a `groups` option to the constructor.
+
+Here is a simple example of specifying the `types` option:
 
     types: [ { name: 'default', label: 'Default (Two Column)' }, { name: 'onecolumn', label: 'One Column' }]
 
-In the future it will be possible to pass functions here that extend the capabilities of particular page types beyond serving standard Apostrophe content, similar to the "engines" feature in Apostrophe 1.5.
+You can also add types later, for instance when initializing other modules such as our blog module. See `pages.addType`.
 
 `pages.serve` has options that can be used to override its behavior in many ways. Complete documentation for the `pages.serve` function is provided at the top of the function in `index.js` (TODO: work on publishing this as jsdoc).
 
@@ -73,6 +81,50 @@ For performance reasons, `pages.getAncestors` and `pages.getDescendants` do not 
 ### Fetching Ancestors and Descendants Automatically ###
 
 `pages.serve` automatically fetches the ancestors of the page into the `ancestors` property of the `page` object given to the page template. In addition, the children of the page are available in the `children` property. If you specify `depth: 2` as an option to `pages.serve`, you may access the grandchildren as well. You may set `depth` as high as your needs require, but for performance reasons it's best not to fetch more detail than you need.
+
+## Loading Additional Data
+
+Most sites require that some extra data be loaded along with pages. The data to be loaded is often dependent on the site structure and the unique needs of the project. The pages.serve function supports this via the load option.
+
+The load option accepts an array made up of page slugs and functions. Any strings found in this array are assumed to be the slugs of pages, usually "virtual pages" whose slugs do not start with a leading / and are not directly reachable by navigating the site. Such pages are loaded and added to the `req.extras` property. All properties of `req.extras` are then made available to your page templates. So if you use the virtual page `global` to hold a shared global footer area, you can access it as `global.areas.footer` in your page templates.
+
+In addition, loaders can be asynchronous functions that modify the `req` object in their own ways. Loaders receive the `req` object as their first parameter and a callback to be invoked on completion as their second parameter. The `req` object will have a `page` property containing the page that matched the slug, if any, and a `remainder` property matching additional content in the URL after the slug if the page is greedy, as explained below.
+
+## Second Chances and "Greedy Pages"
+
+Many sites need to go beyond a simple tree of pages, implementing experiences like blogs and catalogs that require "subpages" to exist for every product or blog post, and URLs that contain elements other than page slugs, such as the date and slug of a blog post. This is easily implemented using greedy pages.
+
+While the `req.page` page property is set only if the slug exactly matches a page, the `req.bestPage` property is set to the page whose slug comes closest to matching the page. To be the "best page," a page must meet the following conditions:
+
+Either (1) it matches the requested URL exactly (in which case req.page and req.bestPage will be the same page), or (2) it matches the longest portion of the URL ending in a `/`.
+
+Examples:
+
+Assume there are pages with the slugs `/blog` and `/blog/credits` in the databsae.
+
+1. If the user requests `/blog` and there is a page with the slug `/blog`, both `req.page` and `req.bestPage` will be set to the `/blog` page object. `req.remainder` will be the empty string.
+2. If the user requests `/blog/2013/01/01/i-like-kittens`, `req.page` will be undefined, and `req.bestPage` will be set to the `/blog` page object. `req.remainder` will be set to `/2013/01/01/i-like-kittens`.
+3. If the user requests `/blog/credits`, `req.page` and `req.bestPage` will both be set to the `/blog/credits` page object. `req.remainder` will be the empty string.
+4. If the user requests `/blog/credits/paul`, `req.page` will be undefined, and `req.bestPage` will be set to the `/blog/credits` page object. `req.remainder` will be set to `/paul`.
+5. For consistency, if the URL ends with a trailing /, this is not included in `req.remainder`.
+
+This approach allows a mix of "ordinary" subpages and subpages implemented by custom logic in a `load` function that examines `req.remainder` and `req.bestPage` to decide what to do.
+
+### Converting req.bestPage to req.page ###
+
+A loader that decides a page should be rendered after all based on a partial match should set `req.page` to `req.bestPage`. Otherwise the page is considered to be a 404.
+
+### Switching Templates In A Load Function ###
+
+You could implement a blog with custom behavior for different values of `remainder` entirely by setting properties of `req.extras` and examining them in your template.
+
+But it is often easier to use an entirely different template, for instance to render a blog post's permalink page differently from the main index of a blog.
+
+To achieve that in your `load` function, just set `req.type` to the template you want to render:
+
+`req.type = 'blogPost';`
+
+Note that you can set `req.type` to `notfound` to display the standard "404 not found" template for the project.
 
 ## User Interface: Adding, Modifying and Removing Pages ##
 
