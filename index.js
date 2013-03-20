@@ -221,11 +221,11 @@ function pages(options, callback) {
         // Get any shared pages like global footers, also
         // invoke load callbacks if needed
 
-        var load = options.load ? options.load : [];
+        var loadList = options.load ? options.load : [];
 
         // Be tolerant if they pass just one function
-        if (typeof(load) === 'function') {
-          load = [ load ];
+        if (typeof(loadList) === 'function') {
+          loadList = [ loadList ];
         }
 
         // Turn any slugs into callbacks to fetch those slugs.
@@ -235,7 +235,7 @@ function pages(options, callback) {
         // we're loading some of them only in certain situations.
         // So let's not prematurely optimize
 
-        load = load.map(function(item) {
+        loadList = loadList.map(function(item) {
           if (typeof(item) !== 'function') {
             return function(callback) {
               apos.getPage(item, function(err, page) {
@@ -257,7 +257,7 @@ function pages(options, callback) {
           }
         });
 
-        return async.parallel(load, callback);
+        return async.parallel(loadList, callback);
       }
 
       function notfound(callback) {
@@ -307,7 +307,7 @@ function pages(options, callback) {
           } else if (req.page) {
             // Make sure the type is allowed
             req.template = req.page.type;
-            if (!_.some(aposPages.types, function(item) {
+            if (_.some(aposPages.types, function(item) {
               return item.name === req.type;
             })) {
               req.template = 'default';
@@ -626,7 +626,7 @@ function pages(options, callback) {
       originalSlug = req.body.originalSlug;
       slug = req.body.slug;
 
-      slug = apos.slugify(slug, { allowed: '/' });
+      slug = apos.slugify(slug, { allow: '/' });
       // Make sure they don't turn it into a virtual page
       if (!slug.match(/^\//)) {
         slug = '/' + slug;
@@ -635,6 +635,10 @@ function pages(options, callback) {
       slug = slug.replace(/\/+/g, '/');
       // Eliminate trailing slashes
       slug = slug.replace(/\/$/, '');
+      // ... But never eliminate the leading /
+      if (!slug.length) {
+        slug = '/';
+      }
 
       async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
 
@@ -653,6 +657,7 @@ function pages(options, callback) {
         return apos.permissions(req, 'edit', page, function(err) {
           // If there is no permissions error then note that we are cool
           // enough to edit the page
+          console.log(err);
           return callback(err);
         });
       }
@@ -670,6 +675,8 @@ function pages(options, callback) {
 
         function putPage(err) {
           if (err) {
+            console.log('putPage: ');
+            console.log(err);
             return callback(err);
           }
           return apos.putPage(originalSlug, page, callback);
@@ -696,6 +703,7 @@ function pages(options, callback) {
         var matchParentSlugPrefix = new RegExp('^' + RegExp.quote(originalSlug + '/'));
         apos.pages.find({ slug: matchParentSlugPrefix }, { items: 0 }).toArray(function(err, descendants) {
           if (err) {
+            console.log('could not get descendants');
             return callback(err);
           }
           var newSlugPrefix = slug + '/';
@@ -708,8 +716,10 @@ function pages(options, callback) {
 
       function sendPage(err) {
         if (err) {
+          console.log('the error:');
+          console.log(err);
           res.statusCode = 500;
-          return res.send('error');
+          return res.send(err);
         }
         return res.send(JSON.stringify(page));
       }
