@@ -293,35 +293,35 @@ function pages(options, callback) {
         // whether it is on the allowed list for manual type choices
         // or not. Otherwise implement standard behaviors
 
-        if (!req.type) {
+        if (!req.template) {
           if (err) {
-            req.type = 'serverError';
+            req.template = 'serverError';
             res.statusCode = 500;
             providePage = false;
           } else if (req.loginRequired) {
-            req.type = 'loginRequired';
+            req.template = 'loginRequired';
             providePage = false;
           } else if (req.insufficient) {
-            req.type = 'insufficient';
+            req.template = 'insufficient';
             providePage = false;
           } else if (req.page) {
             // Make sure the type is allowed
-            req.type = req.page.type;
+            req.template = req.page.type;
             if (!_.some(aposPages.types, function(item) {
               return item.name === req.type;
             })) {
-              req.type = 'default';
+              req.template = 'default';
             }
           } else {
             res.statusCode = 404;
-            req.type = 'notfound';
+            req.template = 'notfound';
             providePage = false;
           }
         }
 
-        if (req.type === undefined) {
-          // Supply a default type name
-          req.type = 'default';
+        if (req.template === undefined) {
+          // Supply a default template name
+          req.template = 'default';
         }
 
         var args = {
@@ -333,16 +333,21 @@ function pages(options, callback) {
 
         _.defaults(args, req.extras);
 
-        var path = __dirname + '/views/' + req.type + '.html';
-        if (options.templatePath) {
-          path = options.templatePath + '/' + req.type + '.html';
-        }
-        if (options.templatePaths) {
-          if (options.templatePaths[type]) {
-            path = options.templatePaths[type] + '/' + req.type + '.html';
+        if (typeof(req.template) === 'string') {
+          var path = __dirname + '/views/' + req.template;
+          if (options.templatePath) {
+            path = options.templatePath + '/' + req.template;
           }
+          if (options.templatePaths) {
+            if (options.templatePaths[type]) {
+              path = options.templatePaths[type] + '/' + req.template;
+            }
+          }
+          return res.send(apos.partial(path, args));
+        } else {
+          // A custom loader gave us a function to render with
+          return res.send(req.template(args));
         }
-        return res.send(apos.partial(path, args));
       }
     };
   };
@@ -452,43 +457,20 @@ function pages(options, callback) {
     });
   };
 
-  // Note that page types passed in should have a name property
-  self.addType = function(typeArg) {
-    // Do this dance carefully so that the group's properties are
-    // applied first and the type's properties are allowed to override them
-    var type = { group: typeArg.group };
-    extend(true, type, aposPages.groups[type.group]);
-    extend(true, type, typeArg);
-    aposPages.types.push(type);
+  // The simplest type you can pass in is an object with name and label properties.
+  // That enables a custom page template in your views folder. You can do a lot more
+  // than that, though; see apostrophe-snippets for the basis from which blogs and
+  // events are both built.
+
+  self.addType = function(type) {
+    self.types.push(type);
   };
-
-  // Add a group (a superclass of page types) that many page types might
-  // specify via their group property, such as ".group='blog'". Any other
-  // properties of the group are then merged with the properties of
-  // types in that group. A similar merge is also carried out on the
-  // browser side, allowing both client- and server-side code to
-  // apply shared properties to all types in the same group. Note that
-  // groups must be added before any types that use them, so you'll be
-  // calling pages.addType
-
-  self.addGroup = function(name, group) {
-    aposPages.groups[name] = group;
-  };
-
-  // Also note .addGroup and .addType for scenarios where
-  // other modules need to be configured after pages and still
-  // contribute the implementation of more types
 
   if (!options.types) {
     options.types = [ { name: 'default', label: 'Default' } ];
   }
 
-  self.groups = [];
   self.types = [];
-
-  _.each(options.groups || [], function(group) {
-    self.addGroup(group);
-  })
 
   _.each(options.types, function(type) {
     self.addType(type);
@@ -503,10 +485,10 @@ function pages(options, callback) {
 
   function determineType(req) {
     var typeName = req.body.type;
-    type = aposPages.getType(typeName);
+    type = self.getType(typeName);
     if (!type) {
       typeName = 'default';
-      type = aposPages.getType(typeName);
+      type = self.getType(typeName);
     }
     return type;
   }
@@ -515,12 +497,11 @@ function pages(options, callback) {
     // Allow for sanitization of data submitted for specific page types.
     // If there is no sanitize function assume there is no data for safety
     if (type.settings && type.settings.sanitize) {
-      console.log('there is a sanitizer');
-      type.settings.sanitize(req.body[type.name] || {}, function(err, data) {
+      type.settings.sanitize(req.body.typeSettings || {}, function(err, data) {
         if (err) {
           return callback(err);
         } else {
-          page[type.name] = data;
+          page.typeSettings = data;
           return callback(null);
         }
       });
@@ -533,12 +514,14 @@ function pages(options, callback) {
   // browser-side UI assets for managing pages
 
   if (options.ui) {
-    apos.scripts.push('/apos-pages/js/pages.js');
+    self.pushAsset = function(type, name) {
+      return apos.pushAsset(type, name, __dirname, '/apos-pages');
+    };
 
-    apos.stylesheets.push('/apos-pages/css/pages.css');
-
-    apos.templates.push(__dirname + '/views/newPageSettings');
-    apos.templates.push(__dirname + '/views/editPageSettings');
+    self.pushAsset('script', 'main');
+    self.pushAsset('stylesheet', 'main');
+    self.pushAsset('template', 'newPageSettings');
+    self.pushAsset('template', 'editPageSettings');
 
     app.post('/apos-pages/new', function(req, res) {
       var parent;
@@ -677,8 +660,6 @@ function pages(options, callback) {
       function updatePage(callback) {
         page.title = title;
         page.slug = slug;
-        console.log('in updatePage the type is...');
-        console.log(type);
         page.type = type.name;
 
         if ((slug !== originalSlug) && (originalSlug === '/')) {
@@ -803,15 +784,15 @@ function pages(options, callback) {
     // beat out the rest
     app.get('/apos-pages/*', apos.static(__dirname + '/public'));
 
-    apos.addLocal('aposEditPage', function(options) {
+    apos.addLocal('aposPagesMenu', function(options) {
       if (!options.root) {
         options.root = '/';
       }
       if (!options.types) {
-        options.types = aposPages.types;
+        options.types = _.map(self.types, function(type) { return { name: type.name, label: type.label }; });
       }
       // Pass the options as one argument so they can be passed on
-      return apos.partial('editPage.html', { args: options }, __dirname + '/views');
+      return apos.partial('pagesMenu', { args: options }, __dirname + '/views');
     });
   }
 

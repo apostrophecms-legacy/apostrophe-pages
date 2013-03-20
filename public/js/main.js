@@ -13,9 +13,35 @@ $.extend(true, window, {
       });
     },
 
+    // Replace a type with a new type object. Typically this is done to replace
+    // a type object we got from the server (with just a name and a label) with a
+    // type object that includes a settings property with functions for a page
+    // settings dialog and so on.
+    //
+    // We replace rather than extending so that closures with references
+    // to "self" still do the right thing.
+
+    replaceType: function(name, object) {
+      var newTypes = [];
+      apos.log('replacing type');
+      for (var i in aposPages.options.types) {
+        var type = aposPages.options.types[i];
+        if (type.name === name) {
+          apos.log('found');
+          object.name = type.name;
+          object.label = type.label;
+          newTypes.push(object);
+        } else {
+          newTypes.push(type);
+        }
+      }
+      apos.log('after search');
+      aposPages.options.types = newTypes;
+    },
+
     enableUI: function(options) {
-      // Available in other scopes
-      aposPages.options = options;
+      apos.log('enableUI args are: ');
+      apos.log(options);
 
       if (!options) {
         options = {};
@@ -24,20 +50,13 @@ $.extend(true, window, {
         options.root = '';
       }
 
-      // Page types inherit behavior from their "group." This allows us to define
-      // many variations on "blog" with different type names (and therefore templates)
-      // but the same behavior. We do it this way with a group name
-      // that comes from the server because there is server side
-      // behavior that needs to be mapped to types as well.
-
-      _.each(aposPages.options.types, function(type) {
-        if (type.group && aposPages.groups[type.group]) {
-          $.extend(true, type, aposPages.groups[type.group]);
-        }
-      });
-
       // Allow / or /pages/ to be specified, just quietly fix it
       options.root = options.root.replace(/\/$/, '');
+
+      // Available in other scopes
+      aposPages.options = options;
+
+      apos.log('options configured');
 
       // Shared state closure for the page settings dialogs (new and edit)
       (function() {
@@ -82,7 +101,7 @@ $.extend(true, window, {
               apos.suggestSlugOnTitleEdits($slug, $title);
 
               return callback(null);
-            },
+            }
           });
           function save(callback) {
             return addOrEdit('edit', { slug: slug }, callback);
@@ -91,9 +110,11 @@ $.extend(true, window, {
         });
 
         function populateType() {
+          apos.log('populateType');
           var $type = $el.find('[name=type]');
           $type.html('');
           _.each(aposPages.options.types, function(type) {
+            apos.log(type);
             var $option = $('<option></option>');
             $option.text(type.label);
             $option.attr('value', type.name);
@@ -115,25 +136,42 @@ $.extend(true, window, {
 
         function refreshType() {
           apos.log('type changed');
+          apos.log($el.find('[name=type]')[0]);
           var typeName = $el.find('[name=type]').val();
           apos.log('type is now ' + typeName);
           if (oldTypeName) {
+            apos.log('there is an old type');
             var oldType = aposPages.getType(oldTypeName);
             if (oldType.settings) {
-              typeData[oldTypeName] = oldType.settings.serialize($el);
+              typeData[oldTypeName] = oldType.settings.serialize($el, $el.find('[data-type-details]'));
             }
+            $el.find('[data-type-details]').html('');
           }
           oldTypeName = typeName;
           var type = aposPages.getType(typeName);
+          apos.log("Type object is now:");
+          apos.log(type);
+
           if (type.settings) {
             apos.log('type has settings');
-            var $typeEl = apos.fromTemplate(type.settings.sel);
-            apos.log($typeEl[0]);
-            apos.log($el.find('[data-type-details]').length);
+            apos.log(type._instance);
+            var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._css);
             $el.find('[data-type-details]').html($typeEl);
-            apos.log('type data is:');
-            apos.log(typeData);
-            type.settings.unserialize(typeData[typeName] || aposPages.options.page[typeName] || {}, $el);
+            apos.log($typeEl.length);
+            apos.log('the page is:');
+            apos.log(aposPages.options.page);
+            var typeDefaults = typeData[typeName];
+            if (!typeDefaults) {
+              if (aposPages.options.page.type === type.name) {
+                typeDefaults = aposPages.options.page.typeSettings;
+              }
+            }
+            if (!typeDefaults) {
+              typeDefaults = {};
+            }
+            apos.log('type defaults are:');
+            apos.log(typeDefaults);
+            type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'));
           }
         }
 
@@ -147,7 +185,10 @@ $.extend(true, window, {
           };
           _.extend(data, { parent: options.parent, originalSlug: options.slug });
           if (type.settings && type.settings.serialize) {
-            data[typeName] = type.settings.serialize($el);
+            apos.log('serializing type specific settings');
+            data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
+            apos.log('I just shoved type specific settings in there.');
+            console.log(data.typeSettings);
           }
           apos.log('data is:');
           apos.log(data);
