@@ -149,7 +149,8 @@ function pages(options, callback) {
           req.bestPage = bestPage;
 
           // Set to the empty string on exact matches, otherwise
-          // to the portion of the URL after the slug of req.bestPage
+          // to the portion of the URL after the slug of req.bestPage. Note
+          // that any trailing / has already been removed
           req.remainder = remainder;
 
           if (req.bestPage) {
