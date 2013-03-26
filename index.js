@@ -132,7 +132,7 @@ function pages(options, callback) {
         if ((!req.slug.length) || (req.slug.charAt(0) !== '/')) {
           req.slug = '/' + req.slug;
         }
-        apos.getPage(req.slug, function(e, page, bestPage, remainder) {
+        apos.getPage(req, req.slug, function(e, page, bestPage, remainder) {
           if (e) {
             return callback(e);
           }
@@ -239,7 +239,7 @@ function pages(options, callback) {
         loadList = loadList.map(function(item) {
           if (typeof(item) !== 'function') {
             return function(callback) {
-              apos.getPage(item, function(err, page) {
+              apos.getPage(req, item, function(err, page) {
                 if (err) {
                   return callback(err);
                 }
@@ -544,7 +544,7 @@ function pages(options, callback) {
 
       function getParent(callback) {
         parentSlug = req.body.parent;
-        return apos.getPage(parentSlug, function(err, parentArg) {
+        return apos.getPage(req, parentSlug, function(err, parentArg) {
           parent = parentArg;
           if ((!err) && (!parent)) {
             err = 'Bad parent';
@@ -560,7 +560,6 @@ function pages(options, callback) {
           return callback(err);
         });
       }
-
 
       // TODO: there's a potential race condition here. It's not a huge deal,
       // having two pages with the same rank just leads to them sorting
@@ -645,7 +644,7 @@ function pages(options, callback) {
 
       function getPage(callback) {
 
-        return apos.getPage(originalSlug, function(err, pageArg) {
+        return apos.getPage(req, originalSlug, function(err, pageArg) {
           page = pageArg;
           if ((!err) && (!page)) {
             err = 'Bad page';
@@ -738,7 +737,7 @@ function pages(options, callback) {
 
       function getPage(callback) {
         pageSlug = req.body.slug;
-        return apos.getPage(pageSlug, function(err, pageArg) {
+        return apos.getPage(req, pageSlug, function(err, pageArg) {
           page = pageArg;
           if(!page) {
             return callback('Not Found');
