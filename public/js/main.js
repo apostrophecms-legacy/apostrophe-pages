@@ -23,11 +23,9 @@ $.extend(true, window, {
 
     replaceType: function(name, object) {
       var newTypes = [];
-      apos.log('replacing type');
       for (var i in aposPages.options.types) {
         var type = aposPages.options.types[i];
         if (type.name === name) {
-          apos.log('found');
           object.name = type.name;
           object.label = type.label;
           newTypes.push(object);
@@ -35,13 +33,10 @@ $.extend(true, window, {
           newTypes.push(type);
         }
       }
-      apos.log('after search');
       aposPages.options.types = newTypes;
     },
 
     enableUI: function(options) {
-      apos.log('enableUI args are: ');
-      apos.log(options);
 
       if (!options) {
         options = {};
@@ -55,8 +50,6 @@ $.extend(true, window, {
 
       // Available in other scopes
       aposPages.options = options;
-
-      apos.log('options configured');
 
       // Shared state closure for the page settings dialogs (new and edit)
       (function() {
@@ -110,11 +103,9 @@ $.extend(true, window, {
         });
 
         function populateType() {
-          apos.log('populateType');
           var $type = $el.find('[name=type]');
           $type.html('');
           _.each(aposPages.options.types, function(type) {
-            apos.log(type);
             var $option = $('<option></option>');
             $option.text(type.label);
             $option.attr('value', type.name);
@@ -135,12 +126,8 @@ $.extend(true, window, {
         }
 
         function refreshType() {
-          apos.log('type changed');
-          apos.log($el.find('[name=type]')[0]);
           var typeName = $el.find('[name=type]').val();
-          apos.log('type is now ' + typeName);
           if (oldTypeName) {
-            apos.log('there is an old type');
             var oldType = aposPages.getType(oldTypeName);
             if (oldType.settings) {
               typeData[oldTypeName] = oldType.settings.serialize($el, $el.find('[data-type-details]'));
@@ -149,17 +136,10 @@ $.extend(true, window, {
           }
           oldTypeName = typeName;
           var type = aposPages.getType(typeName);
-          apos.log("Type object is now:");
-          apos.log(type);
 
           if (type.settings) {
-            apos.log('type has settings');
-            apos.log(type._instance);
             var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._css);
             $el.find('[data-type-details]').html($typeEl);
-            apos.log($typeEl.length);
-            apos.log('the page is:');
-            apos.log(aposPages.options.page);
             var typeDefaults = typeData[typeName];
             if (!typeDefaults) {
               if (aposPages.options.page.type === type.name) {
@@ -169,8 +149,6 @@ $.extend(true, window, {
             if (!typeDefaults) {
               typeDefaults = {};
             }
-            apos.log('type defaults are:');
-            apos.log(typeDefaults);
             type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'));
           }
         }
@@ -185,13 +163,8 @@ $.extend(true, window, {
           };
           _.extend(data, { parent: options.parent, originalSlug: options.slug });
           if (type.settings && type.settings.serialize) {
-            apos.log('serializing type specific settings');
             data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
-            apos.log('I just shoved type specific settings in there.');
-            console.log(data.typeSettings);
           }
-          apos.log('data is:');
-          apos.log(data);
           $.ajax(
             {
               url: '/apos-pages/' + action,
@@ -199,9 +172,6 @@ $.extend(true, window, {
               type: 'POST',
               dataType: 'json',
               success: function(data) {
-                apos.log('success');
-                apos.log(data);
-                apos.log('Redirecting to ' + aposPages.options.root + data.slug);
                 window.location.href = aposPages.options.root + data.slug;
               },
               error: function() {
@@ -226,8 +196,6 @@ $.extend(true, window, {
               type: 'POST',
               dataType: 'json',
               success: function(data) {
-                apos.log('success');
-                apos.log(data);
                 if(data.status === 'ok') {
                   window.location.href = aposPages.options.root + data.parent;
                 } else {
