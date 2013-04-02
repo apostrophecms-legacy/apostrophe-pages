@@ -329,7 +329,9 @@ function pages(options, callback) {
           edit: req.edit,
           slug: req.slug,
           page: providePage ? req.page : null,
-          user: req.user
+          user: req.user,
+          calls: apos.getGlobalCalls() + apos.getCalls(req),
+          data: apos.getGlobalData() + apos.getData(req)
         };
 
         _.defaults(args, req.extras);
