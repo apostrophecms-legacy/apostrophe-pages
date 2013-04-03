@@ -331,10 +331,13 @@ function pages(options, callback) {
           page: providePage ? req.page : null,
           user: req.user,
           calls: apos.getGlobalCalls() + apos.getCalls(req),
-          data: apos.getGlobalData() + apos.getData(req)
+          data: apos.getGlobalData() + apos.getData(req),
+          refreshing: !!req.query.apos_refresh
         };
 
         _.defaults(args, req.extras);
+
+        var content;
 
         if (typeof(req.template) === 'string') {
           var path = __dirname + '/views/' + req.template;
@@ -346,10 +349,24 @@ function pages(options, callback) {
               path = options.templatePaths[type] + '/' + req.template;
             }
           }
-          return res.send(apos.partial(path, args));
+          content = apos.partial(path, args);
         } else {
           // A custom loader gave us a function to render with
-          return res.send(req.template(args));
+          content = req.template(args);
+        }
+
+        // On an AJAX refresh of the main content area only, just send the
+        // main content area. The rest of the time, render the outerLayout and
+        // pass the main content to it
+        if (args.refreshing) {
+          return res.send(content);
+        } else {
+          args.content = content;
+          if (typeof(options.outerLayout) === 'function') {
+            return res.send(options.outerLayout(args));
+          } else {
+            res.send(apos.partial(options.outerLayout || 'outerLayout', args));
+          }
         }
       }
     };
