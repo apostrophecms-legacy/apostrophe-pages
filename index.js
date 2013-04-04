@@ -362,6 +362,16 @@ function pages(options, callback) {
           return res.send(content);
         } else {
           args.content = content;
+          // This is a temporary, horrible workaround for the lack of
+          // conditional extends in nunjucks, allowing us to override
+          // something in the outer layout by planting this special
+          // comment in the inner layout ow ow ow. Yes we know it's
+          // on us to contribute this feature to nunjucks if we care so much.
+          var match = args.content.match(/\<\!\-\- APOS\-BODY\-CLASS (.*?) \-\-\>/);
+          if (match) {
+            args.bodyClass = match[1];
+          }
+
           if (typeof(options.outerLayout) === 'function') {
             return res.send(options.outerLayout(args));
           } else {
