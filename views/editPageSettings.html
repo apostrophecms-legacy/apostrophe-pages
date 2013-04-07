@@ -2,16 +2,20 @@
   <h3>{% block action %}Edit Page{% endblock %}</h3>
   <div class="apos-modal-body">
     <form>
-      <fieldset>
+      <fieldset class="apos-fieldset apos-fieldset-text">
         <label>Title</label>
         <input name="title" type="text" />
       </fieldset>
-      <fieldset>
+
+      <fieldset class="apos-fieldset apos-fieldset-select">
         <label>Type</label>
-        <select name="type">
-        </select>
+        <div class="apos-control apos-menu-style apos-menu">
+          <select class="apos-menu-select" name="type">
+          </select>
+        </div>
       </fieldset>
-      <fieldset>
+
+      <fieldset class="apos-fieldset apos-fieldset-text">
         <label>Slug</label>
         <input name="slug" type="text" />
       </fieldset>
