@@ -8,9 +8,13 @@ $.extend(true, window, {
     // optimization later.
 
     getType: function(name) {
-      return _.find(aposPages.options.types, function(item) {
+      return _.find(apos.data.aposPages.types, function(item) {
         return item.name === name;
       });
+    },
+
+    addType: function(type) {
+      apos.data.aposPages.types.push(type);
     },
 
     // Replace a type with a new type object. Typically this is done to replace
@@ -23,8 +27,8 @@ $.extend(true, window, {
 
     replaceType: function(name, object) {
       var newTypes = [];
-      for (var i in aposPages.options.types) {
-        var type = aposPages.options.types[i];
+      for (var i in apos.data.aposPages.types) {
+        var type = apos.data.aposPages.types[i];
         if (type.name === name) {
           object.name = type.name;
           object.label = type.label;
@@ -33,16 +37,20 @@ $.extend(true, window, {
           newTypes.push(type);
         }
       }
-      aposPages.options.types = newTypes;
+      apos.data.aposPages.types = newTypes;
     },
 
+    // Right now this is called even for noneditors, but we don't put the
+    // menu dropdown markup in the admin bar for them. TODO: we need to better
+    // separate globally useful stuff like apos.data.aposPages.types from
+    // clearly editor-specific stuff like editing page settings
     enableUI: function(options) {
 
       if (!options) {
         options = {};
       }
       if (!options.root) {
-        options.root = '';
+        options.root = apos.data.aposPages.root;
       }
 
       // Allow / or /pages/ to be specified, just quietly fix it
@@ -80,8 +88,8 @@ $.extend(true, window, {
             save: save,
             init: function(callback) {
               populateType();
-              $el.find('[name=type]').val(aposPages.options.page.type);
-              $el.find('[name=title]').val(aposPages.options.page.title);
+              $el.find('[name=type]').val(apos.data.aposPages.page.type);
+              $el.find('[name=title]').val(apos.data.aposPages.page.title);
               $el.find('[name=slug]').val(slug);
               refreshType();
 
@@ -105,7 +113,7 @@ $.extend(true, window, {
         function populateType() {
           var $type = $el.find('[name=type]');
           $type.html('');
-          _.each(aposPages.options.types, function(type) {
+          _.each(apos.data.aposPages.types, function(type) {
             var $option = $('<option></option>');
             $option.text(type.label);
             $option.attr('value', type.name);
@@ -142,8 +150,8 @@ $.extend(true, window, {
             $el.find('[data-type-details]').html($typeEl);
             var typeDefaults = typeData[typeName];
             if (!typeDefaults) {
-              if (aposPages.options.page.type === type.name) {
-                typeDefaults = aposPages.options.page.typeSettings;
+              if (apos.data.aposPages.page.type === type.name) {
+                typeDefaults = apos.data.aposPages.page.typeSettings;
               }
             }
             if (!typeDefaults) {

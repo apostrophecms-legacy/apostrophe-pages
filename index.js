@@ -14,6 +14,18 @@ function pages(options, callback) {
   var self = this;
   var aposPages = this;
 
+  function getTypeChoices() {
+    return _.map(
+      self.types,
+      function(type) {
+        return {
+          name: type.name,
+          label: type.label
+        };
+      }
+    );
+  }
+
   // Usage: app.get('*', pages.serve({ typePath: __dirname + '/views/pages' }))
   //
   // If you use this global wildcard route, make it your LAST route,
@@ -345,10 +357,18 @@ function pages(options, callback) {
           req.template = 'default';
         }
 
+        if (providePage) {
+          req.pushData({
+            aposPages: {
+              page: req.bestPage
+            }
+          });
+        }
+
         var args = {
           edit: req.edit,
           slug: req.slug,
-          page: providePage ? req.page : null,
+          page: providePage ? req.bestPage : null,
           user: req.user,
           calls: apos.getGlobalCalls() + apos.getCalls(req),
           data: apos.getGlobalData() + apos.getData(req),
@@ -549,6 +569,7 @@ function pages(options, callback) {
 
   self.addType = function(type) {
     self.types.push(type);
+    apos.pushGlobalCall('aposPages.addType(?)', { name: type.name, label: type.label });
   };
 
   if (!options.types) {
@@ -557,9 +578,19 @@ function pages(options, callback) {
 
   self.types = [];
 
+  apos.pushGlobalData({
+    aposPages: {
+      root: options.root || '/',
+      types: []
+    }
+  });
+
+  // This pushes more entries browser side as well
   _.each(options.types, function(type) {
     self.addType(type);
   });
+
+  apos.pushGlobalCall('aposPages.enableUI()', options.uiOptions || {});
 
   if (options.ui === undefined) {
     options.ui = true;
@@ -879,12 +910,6 @@ function pages(options, callback) {
     app.get('/apos-pages/*', apos.static(__dirname + '/public'));
 
     apos.addLocal('aposPagesMenu', function(options) {
-      if (!options.root) {
-        options.root = '/';
-      }
-      if (!options.types) {
-        options.types = _.map(self.types, function(type) { return { name: type.name, label: type.label }; });
-      }
       // Pass the options as one argument so they can be passed on
       return apos.partial('pagesMenu', { args: options }, __dirname + '/views');
     });
