@@ -66,13 +66,13 @@ the children of a particular page.
 ### Fetching Ancestors and Descendants Manually ###
 
 `pages.getAncestors` and `pages.getDescendants` can be used to fetch
-the ancestors and descendants of a page. `pages.getAncestors(page, callback)` delivers
-ancestor pages to its callback, in order beginning with the root page. 
-`pages.getDescendants(page, callback)` delivers the children of the page, in order by rank.
+the ancestors and descendants of a page. `pages.getAncestors(req, page, callback)` delivers
+ancestor pages to its callback, in order beginning with the root page.
+`pages.getDescendants(req, page, callback)` delivers the children of the page, in order by rank. `req` must be passed to provide a context for permissions (`req.user`) and, potentially, for caching during the lifetime of a single request. It must be either a real Express request object or some other object acceptable to your `apos.permissions` function.
 
 You can optionally specify a depth:
 
-`pages.getDescendants(page, { depth: 2 }, callback)`
+`pages.getDescendants(req, page, { depth: 2 }, callback)`
 
 In this case your callback still receives an array of the immediate children of `page`. However, each of those pages has a `children` property containing an array of its children.
 
