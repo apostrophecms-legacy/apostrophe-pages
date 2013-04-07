@@ -375,31 +375,51 @@ function pages(options, callback) {
           content = req.template(args);
         }
 
-        // On an AJAX refresh of the main content area only, just send the
-        // main content area. The rest of the time, render the outerLayout and
-        // pass the main content to it
-        if (args.refreshing) {
-          return res.send(content);
-        } else {
-          args.content = content;
-          // This is a temporary, horrible workaround for the lack of
-          // conditional extends in nunjucks, allowing us to override
-          // something in the outer layout by planting this special
-          // comment in the inner layout ow ow ow. Yes we know it's
-          // on us to contribute this feature to nunjucks if we care so much.
-          var match = args.content.match(/\<\!\-\- APOS\-BODY\-CLASS (.*?) \-\-\>/);
-          if (match) {
-            args.bodyClass = match[1];
-          }
-
-          if (typeof(options.outerLayout) === 'function') {
-            return res.send(options.outerLayout(args));
-          } else {
-            res.send(apos.partial(options.outerLayout || 'outerLayout', args));
-          }
-        }
+        args.content = content;
+        return res.send(self.decoratePageContent(args));
       }
     };
+  };
+
+  // Decorate the contents of args.content as a complete webpage. If args.refreshing is
+  // true, return just that content, as we're performing an AJAX refresh of the main
+  // content area. If args.refreshing is not true, return it as a completely
+  // new page (CSS, JS, head, body...) wrapped in the outerLayout template. This is
+  // made available to allow developers to render other content the same way
+  // Apostrophe pages are rendered. For instance, it's useful for a local
+  // login page template, a site reorganization screen or anything else that
+  // is a poor fit for a page template or a javascript modal.
+  //
+  // This may go away when nunjucks gets conditional extends.
+  //
+  // As a workaround to allow you to set the body class, use a comment like this
+  // inside args.content:
+  //
+  // <!-- APOS-BODY-CLASS class names here -->
+
+  self.decoratePageContent = function(args) {
+    // On an AJAX refresh of the main content area only, just send the
+    // main content area. The rest of the time, render the outerLayout and
+    // pass the main content to it
+    if (args.refreshing) {
+      return args.content;
+    } else {
+      // This is a temporary, horrible workaround for the lack of
+      // conditional extends in nunjucks, allowing us to override
+      // something in the outer layout by planting this special
+      // comment in the inner layout ow ow ow. Yes we know it's
+      // on us to contribute this feature to nunjucks if we care so much.
+      var match = args.content.match(/<\!\-\- APOS\-BODY\-CLASS (.*?) \-\-\>/);
+      if (match) {
+        args.bodyClass = match[1];
+      }
+
+      if (typeof(options.outerLayout) === 'function') {
+        return options.outerLayout(args);
+      } else {
+        return apos.partial(options.outerLayout || 'outerLayout', args);
+      }
+    }
   };
 
   // You can skip the options parameter. We need req to
