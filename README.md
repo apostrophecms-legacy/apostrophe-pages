@@ -80,7 +80,33 @@ For performance reasons, `pages.getAncestors` and `pages.getDescendants` do not 
 
 ### Fetching Ancestors and Descendants Automatically ###
 
-`pages.serve` automatically fetches the ancestors of the page into the `ancestors` property of the `page` object given to the page template. In addition, the children of the page are available in the `children` property. If you specify `depth: 2` as an option to `pages.serve`, you may access the grandchildren as well. You may set `depth` as high as your needs require, but for performance reasons it's best not to fetch more detail than you need.
+`pages.serve` automatically fetches the ancestors of the page into the `ancestors` property of the `page` object given to the page template. In addition, the children of the page are available in the `children` property. And the children of the home page (whether the current page is the home page or not) are available in the `tabs` property.
+
+If you need to see the descendants of the current page to a greater depth, set the `descendantOptions` option when calling `pages.serve`:
+
+    {
+      descendantOptions: {
+        depth: 2
+      }
+    }
+
+You can then look at the `children` property of each entry in `page.children`, and so on.
+
+To do the same thing for descendants of the home page, set:
+
+    {
+      tabOptions: {
+        depth: 2
+      }
+    }
+
+You can also shut off ancestors, descendants or tabs entirely if you're not interested:
+
+    {
+      ancestors: false
+      tabs: false,
+      descendants: false,
+    }
 
 ## Loading Additional Data
 

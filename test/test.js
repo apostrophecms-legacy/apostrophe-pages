@@ -9,6 +9,8 @@ var pages;
 
 var page;
 
+var req = {};
+
 describe('apostrophe-pages', function() {
   describe('test database connection open', function() {
     it('initialize mongodb', function(done) {
@@ -23,7 +25,7 @@ describe('apostrophe-pages', function() {
       db.open(function(err) {
         collection = new mongo.Collection(db, 'pages');
         assert(!!collection);
-        pages = require('../index.js')({ apos: { pages: collection }, app: {}, ui: false });
+        pages = require('../index.js')({ apos: { pages: collection, permissions: function(req, action, object, callback) { return callback(null); } }, app: {}, ui: false });
         assert(!!pages);
         done();
       });
@@ -90,7 +92,7 @@ describe('apostrophe-pages', function() {
   });
   describe('fetch ancestors of home page (should be empty)', function() {
     it('fetched', function(done) {
-      pages.getAncestors(page, function(err, ancestors) {
+      pages.getAncestors(req, page, function(err, ancestors) {
         assert(ancestors.length === 0);
         done();
       });
@@ -101,7 +103,7 @@ describe('apostrophe-pages', function() {
 
   describe('fetch descendants of home page', function() {
     it('fetched', function(done) {
-      pages.getDescendants(page, { depth: 2 }, function(err, childrenArg) {
+      pages.getDescendants(req, page, { depth: 2 }, function(err, childrenArg) {
         children = childrenArg;
         assert(!err);
         assert(children.length === 3);
@@ -126,8 +128,8 @@ describe('apostrophe-pages', function() {
 
   describe('fetch ancestors of home/about/people', function() {
     it('fetched', function(done) {
-      var people = children[0];
-      pages.getAncestors(people, function(err, ancestorsArg) {
+      var people = children[0].children[0];
+      pages.getAncestors(req, people, function(err, ancestorsArg) {
         assert(!err);
         assert(ancestorsArg);
         ancestors = ancestorsArg;

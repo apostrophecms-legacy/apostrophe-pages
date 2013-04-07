@@ -204,16 +204,36 @@ function pages(options, callback) {
         }
         async.series([
           function(callback) {
-            return self.getAncestors(req.bestPage, options, function(err, ancestors) {
-              req.bestPage.ancestors = ancestors;
-              return callback(err);
-            });
+            // If you want tabs you also get ancestors, so that
+            // the home page is available (the parent of tabs).
+            if (options.ancestors || options.tabs || true) {
+              return self.getAncestors(req, req.bestPage, options.ancestorOptions || {}, function(err, ancestors) {
+                req.bestPage.ancestors = ancestors;
+                return callback(err);
+              });
+            } else {
+              return callback(null);
+            }
           },
           function(callback) {
-            return self.getDescendants(req.bestPage, options, function(err, children) {
-              req.bestPage.children = children;
-              return callback(err);
-            });
+            if (options.descendants || true) {
+              return self.getDescendants(req, req.bestPage, options.descendantOptions || {}, function(err, children) {
+                req.bestPage.children = children;
+                return callback(err);
+              });
+            } else {
+              return callback(null);
+            }
+          },
+          function(callback) {
+            if (options.tabs || true) {
+              self.getDescendants(req, req.bestPage.ancestors[0] ? req.bestPage.ancestors[0] : req.bestPage, options.tabOptions || {}, function(err, pages) {
+                req.bestPage.tabs = pages;
+                return callback(err);
+              });
+            } else {
+              return callback(null);
+            }
           }
         ], callback);
       }
@@ -382,8 +402,9 @@ function pages(options, callback) {
     };
   };
 
-  // You can also call with just the page and callback arguments
-  self.getAncestors = function(page, options, callback) {
+  // You can skip the options parameter. We need req to
+  // determine permissions
+  self.getAncestors = function(req, page, options, callback) {
     if (!callback) {
       callback = options;
       options = {};
@@ -418,15 +439,15 @@ function pages(options, callback) {
         }
         _.each(pages, function(page) {
           page.url = options.root + page.slug;
-        })
-        return callback(null, pages);
+        });
+        return self.filterByView(req, pages, callback);
       });
     }
     return callback(null);
   };
 
   // You may skip the options parameter and pass just page and callback
-  self.getDescendants = function(page, options, callback) {
+  self.getDescendants = function(req, page, options, callback) {
     if (!callback) {
       callback = options;
       options = {};
@@ -457,25 +478,39 @@ function pages(options, callback) {
       if (err) {
         return callback(err);
       }
-      var children = [];
-      var pagesByPath = {};
-      _.each(pages, function(page) {
-        page.children = [];
-        page.url = options.root + page.slug;
-        pagesByPath[page.path] = page;
-        var last = page.path.lastIndexOf('/');
-        var parentPath = page.path.substr(0, last);
-        if (pagesByPath[parentPath]) {
-          pagesByPath[parentPath].children.push(page);
-        } else {
-          children.push(page);
-        }
+      return self.filterByView(req, pages, function(err, pages) {
+        var children = [];
+        var pagesByPath = {};
+        _.each(pages, function(page) {
+          page.children = [];
+          page.url = options.root + page.slug;
+          pagesByPath[page.path] = page;
+          var last = page.path.lastIndexOf('/');
+          var parentPath = page.path.substr(0, last);
+          if (pagesByPath[parentPath]) {
+            pagesByPath[parentPath].children.push(page);
+          } else {
+            children.push(page);
+          }
+        });
+        return callback(null, children);
       });
-      return callback(null, children);
     });
   };
 
-    // Return a page type object if one was configured for the given type name.
+  // Accepts page objects and filters them to those that the
+  // current user is permitted to view
+  self.filterByView = function(req, pages, callback) {
+    async.filter(pages, function(page, callback) {
+      return apos.permissions(req, 'view-page', page, function(err) {
+        return callback(!err);
+      });
+    }, function(pages) {
+      return callback(null, pages);
+    });
+  };
+
+  // Return a page type object if one was configured for the given type name.
   // JavaScript doesn't iterate over object properties in a defined order,
   // so we maintain the list of types as a flat array. This convenience method
   // prevents this from being inconvenient and allows us to choose to do more
@@ -595,7 +630,7 @@ function pages(options, callback) {
       // randomly, the page tree is not destroyed. But we should have a
       // cleanup task or a lock mechanism
       function getNextRank(callback) {
-        self.getDescendants(parent, { depth: 1}, function(err, children) {
+        self.getDescendants(req, parent, { depth: 1}, function(err, children) {
           if (err) {
             return callback(err);
           }
@@ -784,7 +819,7 @@ function pages(options, callback) {
       }
 
       function getParent(callback) {
-        self.getAncestors(page, {}, function(err, ancestors) {
+        self.getAncestors(req, page, {}, function(err, ancestors) {
           if(!ancestors.length) {
             return callback('Cannot remove home page');
           }
@@ -794,7 +829,7 @@ function pages(options, callback) {
       }
 
       function checkChildren(callback) {
-        self.getDescendants(page, {depth: 1}, function(err, descendants) {
+        self.getDescendants(req, page, {depth: 1}, function(err, descendants) {
           if(descendants.length) {
             return callback('Remove child pages first');
           }
