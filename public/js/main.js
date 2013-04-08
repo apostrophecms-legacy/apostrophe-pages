@@ -113,7 +113,7 @@ $.extend(true, window, {
         function populateType() {
           var $type = $el.find('[name=type]');
           $type.html('');
-          _.each(apos.data.aposPages.types, function(type) {
+          _.each(apos.data.aposPages.menu || apos.data.aposPages.types, function(type) {
             var $option = $('<option></option>');
             $option.text(type.label);
             $option.attr('value', type.name);

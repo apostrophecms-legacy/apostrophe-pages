@@ -560,6 +560,30 @@ function pages(options, callback) {
     apos.pushGlobalCall('aposPages.addType(?)', { name: type.name, label: type.label });
   };
 
+  // Call this last, AFTER adding all the page types, and only if you do not want
+  // some of them to actually be on the page types menu, or wish to change
+  // the order or labeling. This does not create new types, it only amends
+  // the choices displayed to the user. It's common to use this if you are
+  // registering the snippets module but only want them for widgets, not a page type.
+  //
+  // Example:
+  //
+  // pages.setMenu([
+  //   { name: 'default', label: 'Default (Two Column)' },
+  //   { name: 'home', label: 'Home Page' },
+  //   { name: 'blog', label: 'Blog' },
+  //   { name: 'events', label: 'Events' },
+  //   { name: 'map', label: 'Map' }
+  // ]);
+
+  self.setMenu = function(choices) {
+    apos.pushGlobalData({
+      aposPages: {
+        menu: choices
+      }
+    });
+  };
+
   if (!options.types) {
     options.types = [ { name: 'default', label: 'Default' } ];
   }
