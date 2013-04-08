@@ -14,18 +14,6 @@ function pages(options, callback) {
   var self = this;
   var aposPages = this;
 
-  function getTypeChoices() {
-    return _.map(
-      self.types,
-      function(type) {
-        return {
-          name: type.name,
-          label: type.label
-        };
-      }
-    );
-  }
-
   // Usage: app.get('*', pages.serve({ typePath: __dirname + '/views/pages' }))
   //
   // If you use this global wildcard route, make it your LAST route,
