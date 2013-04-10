@@ -355,7 +355,10 @@ function pages(options, callback) {
 
         var args = {
           edit: req.edit,
-          slug: req.slug,
+          // Make sure we pass the slug of the page, not the
+          // complete URL. Frontend devs are expecting to be able
+          // to use this slug to attach URLs to a page
+          slug: providePage ? req.bestPage.slug : null,
           page: providePage ? req.bestPage : null,
           user: req.user,
           calls: apos.getGlobalCalls() + apos.getCalls(req),
