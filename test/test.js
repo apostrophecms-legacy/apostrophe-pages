@@ -1,78 +1,121 @@
 var assert = require('assert');
 var mongo = require('mongodb');
+var apos = require('apostrophe')();
 
 var db;
 
-var collection;
-
 var pages;
+
+var home;
 
 var page;
 
+var children;
+
+var about;
+
+var contact;
+
 var req = {};
 
+// TODO: test 'before' position for move(), test conflicting paths and slugs
+
 describe('apostrophe-pages', function() {
-  describe('test database connection open', function() {
+  describe('initialize resources', function() {
     it('initialize mongodb', function(done) {
       db = new mongo.Db(
         'apostest',
-        new mongo.Server('localhost', 27017, {}),
+        new mongo.Server('127.0.0.1', 27017, {}),
         // Sensible default of safe: true
         // (soon to be the driver's default)
         { safe: true }
       );
       assert(!!db);
       db.open(function(err) {
-        collection = new mongo.Collection(db, 'pages');
-        assert(!!collection);
-        pages = require('../index.js')({ apos: { pages: collection, permissions: function(req, action, object, callback) { return callback(null); } }, app: {}, ui: false });
+        assert(!err);
+        return done();
+      });
+    });
+    it('initialize apostrophe', function(done) {
+      return apos.init({
+        db: db,
+        app: {
+          request: {},
+          locals: {},
+          get: function() {},
+          post: function() {}
+        }
+      }, function(err) {
+        assert(!err);
+        return done();
+      });
+    });
+    it('initialize apostrophe-pages', function(done) {
+      pages = require('../index.js')({
+        apos: apos,
+        ui: false
+      }, function(err) {
+        assert(!err);
         assert(!!pages);
-        done();
+        return done();
       });
     });
   });
   describe('remove test data', function() {
     it('removed', function(done) {
-      collection.remove({}, function(err) {
+      apos.pages.remove({}, function(err) {
         assert(!err);
         done();
       });
     });
   });
   describe('insert test data', function() {
+    apos.pages = apos.pages;
     it('inserted', function(done) {
-      collection.insert(
+      apos.pages.insert(
         [
           {
+            _id: 'home',
             path: 'home',
             level: 0,
-            rank: 0
+            rank: 0,
+            slug: '/'
           },
           // Kids in scrambled order so sort() has work to do
           {
+            _id: 'contact',
             path: 'home/contact',
             level: 1,
-            rank: 2
+            rank: 2,
+            slug: '/contact'
           },
           {
+            _id: 'about',
             path: 'home/about',
             level: 1,
-            rank: 0
+            rank: 0,
+            slug: '/about'
           },
           {
+            _id: 'location',
             path: 'home/about/location',
             level: 2,
-            rank: 1
+            rank: 1,
+            slug: '/about/location'
           },
           {
+            _id: 'people',
             path: 'home/about/people',
             level: 2,
-            rank: 0
+            rank: 0,
+            slug: '/about/people'
           },
           {
+            _id: 'products',
             path: 'home/products',
             level: 1,
-            rank: 1
+            rank: 1,
+            slug: '/products'
           }
         ], function(err) {
           assert(!err);
@@ -83,8 +126,9 @@ describe('apostrophe-pages', function() {
   });
   describe('fetch home page', function() {
     it('fetched', function(done) {
-      collection.findOne({ path: 'home' }, function(err, doc) {
+      apos.pages.findOne({ _id: 'home' }, function(err, doc) {
         assert(!!doc);
+        home = doc;
         page = doc;
         done();
       });
@@ -99,8 +143,6 @@ describe('apostrophe-pages', function() {
     });
   });
 
-  var children;
-
   describe('fetch descendants of home page', function() {
     it('fetched', function(done) {
       pages.getDescendants(req, page, { depth: 2 }, function(err, childrenArg) {
@@ -111,16 +153,16 @@ describe('apostrophe-pages', function() {
       });
     });
     it('in order', function() {
-      assert(children[0].path === 'home/about');
-      assert(children[1].path === 'home/products');
-      assert(children[2].path === 'home/contact');
+      assert(children[0]._id === 'about');
+      assert(children[1]._id === 'products');
+      assert(children[2]._id === 'contact');
     });
     it('have grandkids', function() {
       assert(children[0].children.length === 2);
     });
     it('grandkids in order', function() {
-      assert(children[0].children[0].path === 'home/about/people');
-      assert(children[0].children[1].path === 'home/about/location');
+      assert(children[0].children[0]._id === 'people');
+      assert(children[0].children[1]._id === 'location');
     });
   });
 
@@ -140,9 +182,131 @@ describe('apostrophe-pages', function() {
       assert(ancestors.length === 2);
     });
     it('correct paths in order', function() {
-      assert(ancestors[0].path === 'home');
-      assert(ancestors[1].path === 'home/about');
+      assert(ancestors[0]._id === 'home');
+      assert(ancestors[1]._id === 'about');
     });
   });
+
+  describe('getParent returns home/about for home/about/people', function() {
+    it('returned', function(done) {
+      var people = children[0].children[0];
+      pages.getParent(req, people, function(err, parent) {
+        assert(!err);
+        assert(parent);
+        assert(parent._id === 'about');
+        about = parent;
+        return done();
+      });
+    });
+  });
+
+  describe('move home/about/people after home/contact', function() {
+    var people;
+    it('people exists', function(done) {
+      people = children[0].children[0];
+      assert(people._id === 'people');
+      done();
+    });
+    it('moved without error', function(done) {
+      pages.move(req, people, '/contact', 'after', function(err) {
+        if (err) {
+          console.log(err);
+        }
+        assert(!err);
+        return done();
+     });
+    });
+    it('home has 4 descendants', function(done) {
+      pages.getDescendants(req, home, { depth: 1 }, function(err, childrenArg) {
+        children = childrenArg;
+        assert(children.length === 4);
+        done();
+      });
+    });
+    it('people is now the final child of home', function(done) {
+      assert(children[3]._id === 'people');
+      return done();
+    });
+    it('slug of people is now /people', function(done) {
+      assert(children[3].slug === '/people');
+      return done();
+    });
+  });
+
+  describe('move home/people back under home/about as first child', function() {
+    var people;
+    it('people exists', function(done) {
+      people = children[3];
+      assert(people._id === 'people');
+      done();
+    });
+    it('moved without error', function(done) {
+      pages.move(req, people, '/about', 'inside', function(err) {
+        if (err) {
+          console.log(err);
+        }
+        assert(!err);
+        return done();
+     });
+    });
+    it('home/about has 2 descendants', function(done) {
+      pages.getDescendants(req, about, { depth: 1 }, function(err, childrenArg) {
+        children = childrenArg;
+        assert(children.length === 2);
+        done();
+      });
+    });
+    it('first child of home/about is now people', function(done) {
+      assert(children[0]._id === 'people');
+      return done();
+    });
+    it('people is at /about/people', function(done) {
+      assert(children[0].slug === '/about/people');
+      return done();
+    });
+  });
+
+  describe('move home/about under home/contact, by slug', function() {
+    var location;
+    it('moved without error', function(done) {
+      pages.move(req, '/about', '/contact', 'inside', function(err) {
+        if (err) {
+          console.log(err);
+        }
+        assert(!err);
+        return done();
+     });
+    });
+    it('got contact', function(done) {
+      apos.pages.findOne({ slug: '/contact' }, function(err, page) {
+        contact = page;
+        assert(page);
+        return done();
+      });
+    });
+    it('home/contact has 1 child', function(done) {
+      pages.getDescendants(req, contact, { depth: 2 }, function(err, childrenArg) {
+        children = childrenArg;
+        assert(children.length === 1);
+        done();
+      });
+    });
+    it('home/contact/about/location exists at the right path', function(done) {
+      apos.pages.findOne({ _id: 'location', path: 'home/contact/about/location' }, function(err, page) {
+        location = page;
+        assert(location);
+        return done();
+      });
+    });
+    it('home/contact/about/location has level 3', function(done) {
+      assert(location.level === 3);
+      return done();
+    });
+    it('home/contact/about/location has slug /contact/about/location', function(done) {
+      assert(location.slug === '/contact/about/location');
+      return done();
+    });
+  });
+
 });
 

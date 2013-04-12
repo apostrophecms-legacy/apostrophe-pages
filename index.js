@@ -1,6 +1,7 @@
 var async = require('async');
 var _ = require('underscore');
 var extend = require('extend');
+var path = require('path');
 
 RegExp.quote = require('regexp-quote');
 
@@ -477,6 +478,19 @@ function pages(options, callback) {
     return callback(null);
   };
 
+  // We need req to determine permissions
+  self.getParent = function(req, page, callback) {
+    return self.getAncestors(req, page, function(err, ancestors) {
+      if (err) {
+        return callback(err);
+      }
+      if (!ancestors.length) {
+        return callback(null);
+      }
+      return callback(null, ancestors[ancestors.length - 1]);
+    });
+  };
+
   // You may skip the options parameter and pass just page and callback
   self.getDescendants = function(req, page, options, callback) {
     if (!callback) {
@@ -526,6 +540,178 @@ function pages(options, callback) {
         });
         return callback(null, children);
       });
+    });
+  };
+
+  // position can be 'before', 'after' or 'inside' and determines the
+  // moved page's new relationship to the target page. You may pass
+  // page objects instead of slugs if you have them
+  self.move = function(req, movedSlug, targetSlug, position, callback) {
+    var moved, target, parent, oldParent;
+    if (typeof(movedSlug) === 'object') {
+      moved = movedSlug;
+    }
+    if (typeof(targetSlug) === 'object') {
+      target = targetSlug;
+    }
+    var rank;
+    var originalPath;
+    var originalSlug;
+    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeOldPeers, nudgeNewPeers, moveSelf, moveDescendants ], finish);
+    function getMoved(callback) {
+      if (moved) {
+        return callback(null);
+      }
+      if (movedSlug.charAt(0) !== '/') {
+        return fail();
+      }
+      apos.pages.findOne({ slug: movedSlug }, function(err, page) {
+        if (!page) {
+          return callback('no such page');
+        }
+        moved = page;
+        if (!moved.level) {
+          return callback('cannot move root');
+        }
+        return callback(null);
+      });
+    }
+    function getTarget(callback) {
+      if (target) {
+        return callback(null);
+      }
+      if (targetSlug.charAt(0) !== '/') {
+        return fail();
+      }
+      apos.pages.findOne({ slug: targetSlug }, function(err, page) {
+        if (!page) {
+          return callback('no such page');
+        }
+        target = page;
+        return callback(null);
+      });
+    }
+    function getOldParent(callback) {
+      self.getParent(req, moved, function(err, parentArg) {
+        oldParent = parentArg;
+        return callback(err);
+      });
+    }
+    function getParent(callback) {
+      if (position === 'inside') {
+        parent = target;
+        rank = 0;
+        return callback(null);
+      }
+      if (position === 'before') {
+        rank = target.rank;
+      } else if (position === 'after') {
+        rank = target.rank + 1;
+      } else {
+        return callback('no such position option');
+      }
+      self.getParent(req, target, function(err, parentArg) {
+        if (!parentArg) {
+          return callback('cannot create peer of home page');
+        }
+        parent = parentArg;
+        return callback(null);
+      });
+    }
+    function permissions(callback) {
+      apos.permissions(req, 'manage-page', parent, function(err) {
+        if (err) {
+          return callback(err);
+        }
+        apos.permissions(req, 'manage-page', moved, callback);
+      });
+    }
+    function nudgeOldPeers(callback) {
+      // Nudge up the pages that used to follow us
+      var oldParentPath = path.dirname(moved.path);
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: rank }}, { $inc: { rank: -1 } }, function(err, count) {
+        return callback(err);
+      });
+    }
+    function nudgeNewPeers(callback) {
+      // Nudge down the pages that should now follow us
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(parent.path + '/')), level: parent.level + 1, rank: { $gte: rank }}, { $inc: { rank: 1 } }, function(err, count) {
+        return callback(err);
+      });
+    }
+    function moveSelf(callback) {
+      originalPath = moved.path;
+      originalSlug = moved.slug;
+      var level = parent.level + 1;
+      var newPath = parent.path + '/' + path.basename(moved.path);
+      // We're going to use update with $set, but we also want to update
+      // the object so that moveDescendants can see what we did
+      moved.path = newPath;
+      // If the old slug wasn't customized, update the slug as well as the path
+      if (parent._id !== oldParent._id) {
+        var matchOldParentSlugPrefix = new RegExp('^' + RegExp.quote(addSlashIfNeeded(oldParent.slug)));
+        if (moved.slug.match(matchOldParentSlugPrefix)) {
+          var slugStem = parent.slug;
+          if (slugStem !== '/') {
+            slugStem += '/';
+          }
+          moved.slug = moved.slug.replace(matchOldParentSlugPrefix, addSlashIfNeeded(parent.slug));
+        }
+      }
+      moved.level = level;
+      moved.rank = rank;
+      apos.putPage(originalSlug, moved, function(err, page) {
+        moved = page;
+        return callback(null);
+      });
+    }
+    function moveDescendants(callback) {
+      return self.updateDescendantPathsAndSlugs(moved, originalPath, originalSlug, callback);
+    }
+    function finish(err) {
+      return callback(err);
+    }
+  };
+
+  self.updateDescendantPathsAndSlugs = function(page, originalPath, originalSlug, callback) {
+    // If our slug changed, then our descendants' slugs should
+    // also change, if they are still similar. You can't do a
+    // global substring replace in MongoDB the way you can
+    // in MySQL, so we need to fetch them and update them
+    // individually. async.mapSeries is a good choice because
+    // there may be zillions of descendants and we don't want
+    // to choke the server. We could use async.mapLimit, but
+    // let's not get fancy just yet
+
+    if ((originalSlug === page.slug) && (originalPath === page.path)) {
+      return callback(null);
+    }
+    var oldLevel = originalPath.split('/').length - 1;
+    var matchParentPathPrefix = new RegExp('^' + RegExp.quote(originalPath + '/'));
+    var matchParentSlugPrefix = new RegExp('^' + RegExp.quote(originalSlug + '/'));
+    var done = false;
+    var cursor = apos.pages.find({ path: matchParentPathPrefix }, { slug: 1, path: 1, level: 1 });
+    return async.whilst(function() { return !done; }, function(callback) {
+      return cursor.nextObject(function(err, desc) {
+        if (err) {
+          return callback(err);
+        }
+        if (!desc) {
+          // This means there are no more objects
+          done = true;
+          return callback(null);
+        }
+        apos.pages.update({ _id: desc._id }, { $set: {
+            // Always matches
+            path: desc.path.replace(matchParentPathPrefix, page.path + '/'),
+            // Might not match, and we don't care (if they edited the slug that far up,
+            // they did so intentionally)
+            slug: desc.slug.replace(matchParentSlugPrefix, page.slug + '/'),
+            level: desc.level + (page.level - oldLevel)
+        }}, callback);
+      });
+    }, function(err) {
+      return callback(err);
     });
   };
 
@@ -593,23 +779,24 @@ function pages(options, callback) {
 
   self.types = [];
 
-  apos.pushGlobalData({
-    aposPages: {
-      root: options.root || '/',
-      types: []
-    }
-  });
+  if (options.ui === undefined) {
+    options.ui = true;
+  }
+
+  if (options.ui) {
+    apos.pushGlobalData({
+      aposPages: {
+        root: options.root || '/',
+        types: []
+      }
+    });
+    apos.pushGlobalCall('aposPages.enableUI()', options.uiOptions || {});
+  }
 
   // This pushes more entries browser side as well
   _.each(options.types, function(type) {
     self.addType(type);
   });
-
-  apos.pushGlobalCall('aposPages.enableUI()', options.uiOptions || {});
-
-  if (options.ui === undefined) {
-    options.ui = true;
-  }
 
   // For visibility in other scopes
   self.options = options;
@@ -649,10 +836,13 @@ function pages(options, callback) {
       return apos.pushAsset(type, name, __dirname, '/apos-pages');
     };
 
+    self.pushAsset('script', 'jqtree');
+    self.pushAsset('stylesheet', 'jqtree');
     self.pushAsset('script', 'main');
     self.pushAsset('stylesheet', 'main');
     self.pushAsset('template', 'newPageSettings');
     self.pushAsset('template', 'editPageSettings');
+    self.pushAsset('template', 'reorganize');
 
     app.post('/apos-pages/new', function(req, res) {
       var parent;
@@ -720,12 +910,6 @@ function pages(options, callback) {
           }
           apos.putPage(page.slug, page, callback);
         }
-      }
-
-      function addSlashIfNeeded(path) {
-        path += '/';
-        path = path.replace('//', '/');
-        return path;
       }
 
       function sendPage(err) {
@@ -817,31 +1001,9 @@ function pages(options, callback) {
         apos.updateRedirect(originalSlug, slug, callback);
       }
 
-      // If our slug changed, then our descendants' slugs should
-      // also change, if they are still similar. You can't do a
-      // global substring replace in MongoDB the way you can
-      // in MySQL, so we need to fetch them and update them
-      // individually. async.mapSeries is a good choice because
-      // there may be zillions of descendants and we don't want
-      // to choke the server. We could use async.mapLimit, but
-      // let's not get fancy just yet
-
       function updateDescendants(callback) {
-        if (originalSlug === slug) {
-          return callback(null);
-        }
-        var matchParentSlugPrefix = new RegExp('^' + RegExp.quote(originalSlug + '/'));
-        apos.pages.find({ slug: matchParentSlugPrefix }, { items: 0 }).toArray(function(err, descendants) {
-          if (err) {
-            console.log('could not get descendants');
-            return callback(err);
-          }
-          var newSlugPrefix = slug + '/';
-          async.mapSeries(descendants, function(descendant, callback) {
-            var newSlug = descendant.slug.replace(matchParentSlugPrefix, newSlugPrefix);
-            return apos.pages.update({ slug: descendant.slug }, { $set: { slug: newSlug } }, callback);
-          }, callback);
-        });
+        // We don't change the path here
+        self.updateDescendantPathsAndSlugs(page, page.path, originalSlug, callback);
       }
 
       function sendPage(err) {
@@ -920,6 +1082,59 @@ function pages(options, callback) {
       }
     });
 
+    app.get('/apos-pages/get-jqtree', function(req, res) {
+      var page;
+      apos.getPage(req, '/', function(err, page) {
+        if (!page) {
+          res.statusCode = 404;
+          return res.send('No Pages');
+        }
+        var data = {
+          label: page.title
+        };
+        self.getDescendants(req, page, { depth: 1000 }, function(err, children) {
+          page.children = children;
+          // jqtree supports more than one top level node, so we have to pass an array
+          data = [ pageToJqtree(page) ];
+          res.send(data);
+        });
+        // Recursively build a tree in the format jqtree expects
+        function pageToJqtree(page) {
+          var info = {
+            label: page.title,
+            slug: page.slug,
+            _id: page._id
+          };
+          if (page.children && page.children.length) {
+            info.children = [];
+            _.each(page.children, function(child) {
+              info.children.push(pageToJqtree(child));
+            });
+          }
+          return info;
+        }
+      });
+    });
+
+    // Decide whether to honor a jqtree 'move' event and carry it out.
+    // This is done by adjusting the path and level properties of the moved page
+    // as well as the rank properties of that page and its new and former peers
+    app.post('/apos-pages/move-jqtree', function(req, res) {
+      function fail() {
+      }
+      var movedSlug = apos.sanitizeString(req.body.moved);
+      var targetSlug = apos.sanitizeString(req.body.target);
+      var position = req.body.position;
+      return self.move(req, movedSlug, targetSlug, position, function(err) {
+        if (err) {
+          res.statusCode = 404;
+          return res.send();
+        } else {
+          return res.send('ok');
+        }
+      });
+    });
+
     // Serve our assets. This is the final route so it doesn't
     // beat out the rest
     app.get('/apos-pages/*', apos.static(__dirname + '/public'));
@@ -936,5 +1151,11 @@ function pages(options, callback) {
     // Unique and sparse together mean that many pages can have no path,
     // but any paths that do exist must be unique
     return apos.pages.ensureIndex({ path: 1 }, { safe: true, unique: true, sparse: true }, callback);
+  }
+
+  function addSlashIfNeeded(path) {
+    path += '/';
+    path = path.replace(/\/\/$/, '/');
+    return path;
   }
 }
