@@ -206,19 +206,16 @@ $.extend(true, window, {
             var _id = page._id;
             $.get('/apos-pages/info', { _id: _id }, function(data) {
               var newPathname = (apos.data.aposPages.root + data.slug).replace(/^\/\//, '/');
-              apos.log(window.location.pathname + ',' + newPathname);
               if (window.location.pathname === newPathname) {
                 apos.change('tree');
                 return callback();
               } else {
                 // Navigates away, so don't call the callback
-                apos.log('navigating away to ' + newPathname);
                 window.location.pathname = newPathname;
               }
             }).error(function() {
               // If the page no longer exists, navigate away to home page
               window.location.pathname = apos.data.aposPages.root;
-              apos.log('navigating away to home: ' + apos.data.aposPages.root);
             });
           }
         });
