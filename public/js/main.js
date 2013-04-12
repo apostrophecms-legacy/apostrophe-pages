@@ -273,30 +273,28 @@ $.extend(true, window, {
 
       $('body').on('click', '.apos-delete-page', function() {
         var slug = $(this).data('slug');
-        if (confirm('Move this page to the trash?')) {
-          $.ajax(
-            {
-              url: '/apos-pages/delete',
-              data: {
-                slug: slug
-              },
-              type: 'POST',
-              dataType: 'json',
-              success: function(data) {
-                if(data.status === 'ok') {
-                  alert('Moved to the trash. Select "Reorganize" from the "Page" menu to drag it back out.');
-                  window.location.href = aposPages.options.root + data.parent;
-                } else {
-                  alert(data.status);
-                }
-              },
-              error: function() {
-                alert('Server error');
+        $.ajax(
+          {
+            url: '/apos-pages/delete',
+            data: {
+              slug: slug
+            },
+            type: 'POST',
+            dataType: 'json',
+            success: function(data) {
+              if(data.status === 'ok') {
+                alert('Moved to the trash. Select "Reorganize" from the "Page" menu to drag it back out.');
+                window.location.href = aposPages.options.root + data.parent;
+              } else {
+                alert(data.status);
               }
+            },
+            error: function() {
+              alert('Server error');
             }
-          );
-          return false;
-        }
+          }
+        );
+        return false;
       });
     }
   }
