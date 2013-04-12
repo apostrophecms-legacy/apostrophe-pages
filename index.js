@@ -1116,6 +1116,28 @@ function pages(options, callback) {
       });
     });
 
+    // Simple JSON access to pages by id. Reorganize uses this to figure out
+    // if the page we're sitting on has been moved out from under us. Does
+    // *not* run loaders, it's meant for a quick peek at data that lives
+    // directly in the page
+    app.get('/apos-pages/info', function(req, res) {
+      var _id = req.query._id;
+      // Do a simple mongo fetch, we don't want the loaders invoked
+      apos.pages.findOne({ _id: _id }, function(err, page) {
+        if (!page) {
+          res.statusCode = 404;
+          return res.send(404);
+        }
+        self.filterByView(req, [ page ], function(err, pages) {
+          if (err || (!pages.length)) {
+            res.statusCode = 404;
+            return res.send(404);
+          }
+          res.send(page);
+        });
+      });
+    });
+
     // Decide whether to honor a jqtree 'move' event and carry it out.
     // This is done by adjusting the path and level properties of the moved page
     // as well as the rank properties of that page and its new and former peers

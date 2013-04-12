@@ -192,6 +192,88 @@ $.extend(true, window, {
         }
       })();
 
+      $('body').on('click', '[data-reorganize-page]', function() {
+        var $tree;
+        var $el = apos.modalFromTemplate('.apos-reorganize-page', {
+          init: function(callback) {
+            reload(callback);
+          },
+          // After a reorg the page URL may have changed, be prepared to
+          // navigate there or to the home page or just refresh to reflect
+          // possible new tabs
+          afterHide: function(callback) {
+            var page = apos.data.aposPages.page;
+            var _id = page._id;
+            $.get('/apos-pages/info', { _id: _id }, function(data) {
+              var newPathname = (apos.data.aposPages.root + data.slug).replace(/^\/\//, '/');
+              apos.log(window.location.pathname + ',' + newPathname);
+              if (window.location.pathname === newPathname) {
+                apos.change('tree');
+                return callback();
+              } else {
+                // Navigates away, so don't call the callback
+                apos.log('navigating away to ' + newPathname);
+                window.location.pathname = newPathname;
+              }
+            }).error(function() {
+              // If the page no longer exists, navigate away to home page
+              window.location.pathname = apos.data.aposPages.root;
+              apos.log('navigating away to home: ' + apos.data.aposPages.root);
+            });
+          }
+        });
+        function reload(callback) {
+          $.getJSON('/apos-pages/get-jqtree', function(data) {
+            $tree = $el.find('[data-tree]');
+            $tree.tree({
+              data: data,
+              autoOpen: 3,
+              dragAndDrop: true,
+              onCanMoveTo: function(moved_node, target_node, position) {
+                // Cannot create peers of root
+                if ((target_node.slug === '/') && (position !== 'inside')) {
+                  return false;
+                }
+                return true;
+              }
+            });
+            $tree.on('tree.move', function(e) {
+              e.preventDefault();
+              var data = {
+                  moved: e.move_info.moved_node.slug,
+                  target: e.move_info.target_node.slug,
+                  position: e.move_info.position
+              };
+              $.ajax({
+                url: '/apos-pages/move-jqtree',
+                data: {
+                  moved: e.move_info.moved_node.slug,
+                  target: e.move_info.target_node.slug,
+                  position: e.move_info.position
+                },
+                type: 'POST',
+                dataType: 'json',
+                success: function() {
+                  e.move_info.do_move();
+                },
+                error: function() {
+                  // This didn't work, probably because something
+                  // else has changed in the page tree. Refreshing
+                  // is an appropriate response
+                  reload(null);
+                }
+              });
+            });
+            if (callback) {
+              return callback();
+            }
+          }).error(function() {
+            alert('The server did not respond or you do not have the appropriate privileges.');
+            $el.trigger('aposModalHide');
+          });
+        }
+      });
+
       $('body').on('click', '.apos-delete-page', function() {
         var slug = $(this).data('slug');
         if (confirm('Delete this page?')) {
