@@ -491,7 +491,11 @@ function pages(options, callback) {
     });
   };
 
-  // You may skip the options parameter and pass just page and callback
+  // You may skip the options parameter and pass just page and callback.
+  // The 'trash' option controls whether pages with the trash flag are
+  // included. If true, only trash is returned. If false, only non-trash
+  // is returned. If null, both are returned. false is the default.
+
   self.getDescendants = function(req, page, options, callback) {
     if (!callback) {
       callback = options;
@@ -504,6 +508,8 @@ function pages(options, callback) {
       root: ''
     });
 
+    // _.defaults treats null and undefined the same ):
+    var trash = (options.trash === undefined) ? false : options.trash;
 
     var depth = options.depth;
     // Careful, let them specify a depth of 0 but still have a good default
@@ -511,11 +517,19 @@ function pages(options, callback) {
       depth = 1;
     }
 
+    var criteria = {
+      path: new RegExp('^' + RegExp.quote(page.path + '/')),
+      level: { $gt: page.level, $lte: page.level + depth }
+    };
+    if (trash === true) {
+      criteria.trash = true;
+    } else if (trash === false) {
+      criteria.trash = { $exists: false };
+    } else if (trash === 'any') {
+      // Show both trash and non-trash (reorganize leverages this)
+    }
     apos.pages.find(
-      {
-        path: new RegExp('^' + RegExp.quote(page.path + '/')),
-        level: { $gt: page.level, $lte: page.level + depth }
-      },
+      criteria,
       { items: 0 }
     ).
     sort( { level: 1, rank: 1 } ).
@@ -557,7 +571,7 @@ function pages(options, callback) {
     var rank;
     var originalPath;
     var originalSlug;
-    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeOldPeers, nudgeNewPeers, moveSelf, moveDescendants ], finish);
+    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeOldPeers, nudgeNewPeers, moveSelf, moveDescendants, trashDescendants ], finish);
     function getMoved(callback) {
       if (moved) {
         return callback(null);
@@ -572,6 +586,10 @@ function pages(options, callback) {
         moved = page;
         if (!moved.level) {
           return callback('cannot move root');
+        }
+        // You can't move the trashcan itself, but you can move its children
+        if (moved.trash && (moved.level === 1)) {
+          return callback('cannot move trashcan');
         }
         return callback(null);
       });
@@ -588,6 +606,9 @@ function pages(options, callback) {
           return callback('no such page');
         }
         target = page;
+        if ((target.trash) && (target.level === 1) && (position === 'after')) {
+          return callback('trash must be last');
+        }
         return callback(null);
       });
     }
@@ -629,7 +650,7 @@ function pages(options, callback) {
     function nudgeOldPeers(callback) {
       // Nudge up the pages that used to follow us
       var oldParentPath = path.dirname(moved.path);
-      apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: rank }}, { $inc: { rank: -1 } }, function(err, count) {
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: moved.rank }}, { $inc: { rank: -1 } }, function(err, count) {
         return callback(err);
       });
     }
@@ -660,6 +681,12 @@ function pages(options, callback) {
       }
       moved.level = level;
       moved.rank = rank;
+      // Are we in the trashcan? Our new parent reveals that
+      if (parent.trash) {
+        moved.trash = true;
+      } else {
+        delete moved.trash;
+      }
       apos.putPage(originalSlug, moved, function(err, page) {
         moved = page;
         return callback(null);
@@ -667,6 +694,18 @@ function pages(options, callback) {
     }
     function moveDescendants(callback) {
       return self.updateDescendantPathsAndSlugs(moved, originalPath, originalSlug, callback);
+    }
+    function trashDescendants(callback) {
+      // Make sure our descendants have the same trash status
+      var matchParentPathPrefix = new RegExp('^' + RegExp.quote(moved.path + '/'));
+      var $set = {};
+      var $unset = {};
+      if (moved.trash) {
+        $set.trash = true;
+      } else {
+        $unset.trash = true;
+      }
+      apos.pages.update({ path: matchParentPathPrefix }, { $set: $set, $unset: $unset }, callback);
     }
     function finish(err) {
       return callback(err);
@@ -1017,56 +1056,47 @@ function pages(options, callback) {
       }
     });
 
+    // Move page to trashcan
     app.post('/apos-pages/delete', function(req, res) {
-
-      async.series([ getPage, permissions, getParent, checkChildren, deletePage], respond);
-
-      var parent;
+      var trash;
       var page;
-      var parentSlug;
-      var title;
-      var nextRank;
+      var parent;
+      async.series([findTrash, findPage, findParent, movePage], respond);
 
-      function getPage(callback) {
-        pageSlug = req.body.slug;
-        return apos.getPage(req, pageSlug, function(err, pageArg) {
+      function findTrash(callback) {
+        // Always only one trash page at level 1, so we don't have to
+        // hardcode the slug
+        apos.pages.findOne({ trash: true, level: 1}, function(err, trashArg) {
+          if (err || (!trashArg)) {
+            return callback('Site has no trashcan, contact administrator');
+          }
+          trash = trashArg;
+          return callback(null);
+        });
+      }
+
+      function findPage(callback) {
+        apos.pages.findOne({ slug: req.body.slug }, function(err, pageArg) {
+          if (err || (!pageArg)) {
+            return callback('Page not found');
+          }
           page = pageArg;
-          if(!page) {
-            return callback('Not Found');
+          return callback(null);
+        });
+      }
+
+      function findParent(callback) {
+        self.getParent(req, page, function(err, parentArg) {
+          if (err || (!parentArg)) {
+            return respond('Cannot move the home page to the trash');
           }
-          return callback(err);
+          parent = parentArg;
+          return callback(null);
         });
       }
 
-      function permissions(callback) {
-        return apos.permissions(req, 'add-page', parent, function(err) {
-          // If there is no permissions error then note that we are cool
-          // enough to edit the page
-          return callback(err);
-        });
-      }
-
-      function getParent(callback) {
-        self.getAncestors(req, page, {}, function(err, ancestors) {
-          if(!ancestors.length) {
-            return callback('Cannot remove home page');
-          }
-          parent = ancestors.pop();
-          return callback(err);
-        });
-      }
-
-      function checkChildren(callback) {
-        self.getDescendants(req, page, {depth: 1}, function(err, descendants) {
-          if(descendants.length) {
-            return callback('Remove child pages first');
-          }
-          return callback(err);
-        });
-      }
-
-      function deletePage(callback) {
-        apos.pages.remove({slug: page.slug}, callback);
+      function movePage(callback) {
+        self.move(req, page, trash, 'inside', callback);
       }
 
       function respond(err) {
@@ -1092,7 +1122,8 @@ function pages(options, callback) {
         var data = {
           label: page.title
         };
-        self.getDescendants(req, page, { depth: 1000 }, function(err, children) {
+        // trash: 'any' means return both trash and non-trash
+        self.getDescendants(req, page, { depth: 1000, trash: 'any' }, function(err, children) {
           page.children = children;
           // jqtree supports more than one top level node, so we have to pass an array
           data = [ pageToJqtree(page) ];
@@ -1103,7 +1134,11 @@ function pages(options, callback) {
           var info = {
             label: page.title,
             slug: page.slug,
-            _id: page._id
+            _id: page._id,
+            // For icons
+            type: page.type,
+            // Also nice for icons and browser-side decisions about what's draggable where
+            trash: page.trash
           };
           if (page.children && page.children.length) {
             info.children = [];
@@ -1152,7 +1187,7 @@ function pages(options, callback) {
           res.statusCode = 404;
           return res.send();
         } else {
-          return res.send('ok');
+          return res.send({status: 'ok'});
         }
       });
     });

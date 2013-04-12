@@ -196,6 +196,45 @@ $.extend(true, window, {
         var $tree;
         var $el = apos.modalFromTemplate('.apos-reorganize-page', {
           init: function(callback) {
+            $tree = $el.find('[data-tree]');
+            $tree.tree({
+              data: [],
+              autoOpen: 3,
+              dragAndDrop: true,
+              onCanMoveTo: function(moved_node, target_node, position) {
+                // Cannot create peers of root
+                if ((target_node.slug === '/') && (position !== 'inside')) {
+                  return false;
+                }
+                return true;
+              }
+            });
+            $tree.on('tree.move', function(e) {
+              e.preventDefault();
+              var data = {
+                  moved: e.move_info.moved_node.slug,
+                  target: e.move_info.target_node.slug,
+                  position: e.move_info.position
+              };
+              apos.log('ajax call beginning');
+              $.ajax({
+                url: '/apos-pages/move-jqtree',
+                data: data,
+                type: 'POST',
+                dataType: 'json',
+                success: function() {
+                  apos.log('success called');
+                  e.move_info.do_move();
+                },
+                error: function() {
+                  apos.log('error called');
+                  // This didn't work, probably because something
+                  // else has changed in the page tree. Refreshing
+                  // is an appropriate response
+                  apos.afterYield(function() { reload(null); });
+                }
+              });
+            });
             reload(callback);
           },
           // After a reorg the page URL may have changed, be prepared to
@@ -221,46 +260,7 @@ $.extend(true, window, {
         });
         function reload(callback) {
           $.getJSON('/apos-pages/get-jqtree', function(data) {
-            $tree = $el.find('[data-tree]');
-            $tree.tree({
-              data: data,
-              autoOpen: 3,
-              dragAndDrop: true,
-              onCanMoveTo: function(moved_node, target_node, position) {
-                // Cannot create peers of root
-                if ((target_node.slug === '/') && (position !== 'inside')) {
-                  return false;
-                }
-                return true;
-              }
-            });
-            $tree.on('tree.move', function(e) {
-              e.preventDefault();
-              var data = {
-                  moved: e.move_info.moved_node.slug,
-                  target: e.move_info.target_node.slug,
-                  position: e.move_info.position
-              };
-              $.ajax({
-                url: '/apos-pages/move-jqtree',
-                data: {
-                  moved: e.move_info.moved_node.slug,
-                  target: e.move_info.target_node.slug,
-                  position: e.move_info.position
-                },
-                type: 'POST',
-                dataType: 'json',
-                success: function() {
-                  e.move_info.do_move();
-                },
-                error: function() {
-                  // This didn't work, probably because something
-                  // else has changed in the page tree. Refreshing
-                  // is an appropriate response
-                  reload(null);
-                }
-              });
-            });
+            $tree.tree('loadData', data);
             if (callback) {
               return callback();
             }
@@ -273,7 +273,7 @@ $.extend(true, window, {
 
       $('body').on('click', '.apos-delete-page', function() {
         var slug = $(this).data('slug');
-        if (confirm('Delete this page?')) {
+        if (confirm('Move this page to the trash?')) {
           $.ajax(
             {
               url: '/apos-pages/delete',
@@ -284,6 +284,7 @@ $.extend(true, window, {
               dataType: 'json',
               success: function(data) {
                 if(data.status === 'ok') {
+                  alert('Moved to the trash. Select "Reorganize" from the "Page" menu to drag it back out.');
                   window.location.href = aposPages.options.root + data.parent;
                 } else {
                   alert(data.status);
