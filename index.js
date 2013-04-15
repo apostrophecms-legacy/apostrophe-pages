@@ -687,7 +687,7 @@ function pages(options, callback) {
       } else {
         delete moved.trash;
       }
-      apos.putPage(originalSlug, moved, function(err, page) {
+      apos.putPage(req, originalSlug, moved, function(err, page) {
         moved = page;
         return callback(null);
       });
@@ -913,9 +913,9 @@ function pages(options, callback) {
       }
 
       function permissions(callback) {
-        return apos.permissions(req, 'add-page', parent, function(err) {
+        return apos.permissions(req, 'manage-page', parent, function(err) {
           // If there is no permissions error then note that we are cool
-          // enough to edit the page
+          // enough to manage the page
           return callback(err);
         });
       }
@@ -947,7 +947,7 @@ function pages(options, callback) {
           if (err) {
             return callback(err);
           }
-          apos.putPage(page.slug, page, callback);
+          apos.putPage(req, page.slug, page, callback);
         }
       }
 
@@ -1032,7 +1032,7 @@ function pages(options, callback) {
             console.log(err);
             return callback(err);
           }
-          return apos.putPage(originalSlug, page, callback);
+          return apos.putPage(req, originalSlug, page, callback);
         }
       }
 
