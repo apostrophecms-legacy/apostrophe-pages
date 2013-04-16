@@ -296,6 +296,40 @@ $.extend(true, window, {
         );
         return false;
       });
+
+      $('body').on('click', '[data-versions-page]', function() {
+        var pageId = apos.data.aposPages.page._id;
+        var $el = apos.modalFromTemplate('.apos-versions-page', {
+          init: function(callback) {
+            $versions = $el.find('[data-versions]');
+
+            $versions.on('click', '[data-version-id]', function() {
+              var id = $(this).data('versionId');
+              $.post('/apos-pages/revert',
+                { page_id: pageId, version_id: id },
+                function(data) {
+                  alert('Switched versions.');
+                  $el.trigger('aposModalHide');
+                  apos.change('revert');
+                }
+              ).error(function() {
+                alert('Server error or version no longer available.');
+              });
+            });
+
+            // Load the available versions
+            $template = $versions.find('[data-version].apos-template');
+            $template.detach();
+            // Easier to render as a nice server side template
+            $.get('/apos-pages/versions', {
+              _id: pageId
+            }, function(data) {
+              $versions.html(data);
+            });
+            return callback();
+          }
+        });
+      });
     }
   }
 });

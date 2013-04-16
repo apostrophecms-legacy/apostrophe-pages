@@ -882,6 +882,7 @@ function pages(options, callback) {
     self.pushAsset('template', 'newPageSettings');
     self.pushAsset('template', 'editPageSettings');
     self.pushAsset('template', 'reorganize');
+    self.pushAsset('template', 'pageVersions');
 
     app.post('/apos-pages/new', function(req, res) {
       var parent;
@@ -1171,6 +1172,102 @@ function pages(options, callback) {
           res.send(page);
         });
       });
+    });
+
+    // Return past versions of a page (just the metadata and the diff),
+    // rendered via the versions.html template
+    app.get('/apos-pages/versions', function(req, res) {
+      var _id = req.query._id;
+      var page;
+      var versions;
+
+      function findPage(callback) {
+        return apos.pages.findOne({ _id: _id }, function(err, pageArg) {
+          page = pageArg;
+          return callback(err);
+        });
+      }
+
+      function permissions(callback) {
+        return apos.permissions(req, 'edit-page', page, callback);
+      }
+
+      function findVersions(callback) {
+        return apos.versions.find({ pageId: _id }, { _id: 1, diff: 1, createdAt: 1, author: 1}).sort({ createdAt: -1 }).toArray(function(err, versionsArg) {
+          versions = versionsArg;
+          return callback(err);
+        });
+      }
+
+      function ready(err) {
+        if (err) {
+          res.statusCode = 404;
+          return res.send();
+        } else {
+          return res.send(apos.partial('versions', { versions: versions }));
+        }
+      }
+
+      async.series([findPage, permissions, findVersions], ready);
+    });
+
+    app.post('/apos-pages/revert', function(req, res) {
+      var pageId = req.body.page_id;
+      var versionId = req.body.version_id;
+      var page;
+      var version;
+
+      function findPage(callback) {
+        return apos.pages.findOne({ _id: pageId }, function(err, pageArg) {
+          page = pageArg;
+          return callback(err);
+        });
+      }
+
+      function permissions(callback) {
+        return apos.permissions(req, 'edit-page', page, callback);
+      }
+
+      function findVersion(callback) {
+        return apos.versions.findOne({ _id: versionId }, function(err, versionArg) {
+          version = versionArg;
+          return callback(err);
+        });
+      }
+
+      function revert(callback) {
+        // Remove properties that belong to the version, not the page
+        // it is a copy of
+        delete version._id;
+        delete version.createdAt;
+        delete version.diff;
+        delete version.author;
+        delete version.pageId;
+        // Remove properties of the page that we cannot revert because they
+        // alter the relationship of the page to other pages in unpredictable ways
+        // which may destroy the navigability of the page tree or create
+        // slug conflicts. Think of these properties as belonging to the tree,
+        // not the page
+        delete version.level;
+        delete version.path;
+        delete version.slug;
+        delete version.rank;
+        // Now we can merge the version back onto the page, reverting it
+        extend(true, page, version);
+        // Use apos.putPage so that a new version with a new diff is saved
+        return apos.putPage(req, page.slug, page, callback);
+      }
+
+      function ready(err) {
+        if (err) {
+          res.statusCode = 404;
+          return res.send();
+        } else {
+          return res.send('OK');
+        }
+      }
+
+      async.series([findPage, permissions, findVersion, revert], ready);
     });
 
     // Decide whether to honor a jqtree 'move' event and carry it out.
