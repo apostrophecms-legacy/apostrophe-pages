@@ -1211,6 +1211,11 @@ function pages(options, callback) {
       async.series([findPage, permissions, findVersions], ready);
     });
 
+    self.revertListeners = [];
+    self.addRevertListener = function(listener) {
+      self.revertListeners.push(listener);
+    };
+
     app.post('/apos-pages/revert', function(req, res) {
       var pageId = req.body.page_id;
       var versionId = req.body.version_id;
@@ -1252,6 +1257,13 @@ function pages(options, callback) {
         delete version.path;
         delete version.slug;
         delete version.rank;
+        // Allow listeners to remove dangerous properties that shouldn't
+        // be overwritten in a revert, for instance because they relate
+        // to a larger structure that is not being reverted as a whole
+        // (like the page tree related fields just above)
+        _.each(self.revertListeners, function(listener) {
+          listener(version);
+        });
         // Now we can merge the version back onto the page, reverting it
         extend(true, page, version);
         // Use apos.putPage so that a new version with a new diff is saved
