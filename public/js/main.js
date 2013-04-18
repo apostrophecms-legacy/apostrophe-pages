@@ -88,6 +88,8 @@ $.extend(true, window, {
             save: save,
             init: function(callback) {
               populateType();
+              // TODO: refactor this frequently used dance of boolean values
+              // into editor.js or content.js
               var published = apos.data.aposPages.page.published;
               if (published === undefined) {
                 published = 1;
