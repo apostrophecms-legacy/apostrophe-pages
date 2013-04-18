@@ -496,7 +496,7 @@ function pages(options, callback) {
   // included. If true, only trash is returned. If false, only non-trash
   // is returned. If null, both are returned. false is the default.
 
-  self.getDescendants = function(req, page, options, callback) {
+  self.getDescendants = function(req, ofPage, options, callback) {
     if (!callback) {
       callback = options;
       options = {};
@@ -518,8 +518,8 @@ function pages(options, callback) {
     }
 
     var criteria = {
-      path: new RegExp('^' + RegExp.quote(page.path + '/')),
-      level: { $gt: page.level, $lte: page.level + depth }
+      path: new RegExp('^' + RegExp.quote(ofPage.path + '/')),
+      level: { $gt: ofPage.level, $lte: ofPage.level + depth }
     };
     if (trash === true) {
       criteria.trash = true;
@@ -548,8 +548,11 @@ function pages(options, callback) {
           var parentPath = page.path.substr(0, last);
           if (pagesByPath[parentPath]) {
             pagesByPath[parentPath].children.push(page);
-          } else {
+          } else if (page.level === (ofPage.level + 1)) {
             children.push(page);
+          } else {
+            // The parent of this page is hidden from us, so we shouldn't
+            // include this page in the results as viewed from here
           }
         });
         return callback(null, children);
@@ -891,12 +894,15 @@ function pages(options, callback) {
       var title;
       var type;
       var nextRank;
+      var published;
 
       title = req.body.title.trim();
       // Validation is annoying, automatic cleanup is awesome
       if (!title.length) {
         title = 'New Page';
       }
+
+      published = apos.sanitizeBoolean(req.body.published, true);
 
       type = determineType(req);
 
@@ -942,7 +948,7 @@ function pages(options, callback) {
       }
 
       function insertPage(callback) {
-        page = { title: title, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+        page = { title: title, published: published, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
         addSanitizedTypeData(req, page, type, putPage);
         function putPage(err) {
           if (err) {
@@ -967,6 +973,7 @@ function pages(options, callback) {
       var originalSlug;
       var slug;
       var title;
+      var published;
       var type;
 
       title = req.body.title.trim();
@@ -974,6 +981,8 @@ function pages(options, callback) {
       if (!title.length) {
         title = 'Untitled Page';
       }
+
+      published = apos.sanitizeBoolean(req.body.published, true);
 
       type = determineType(req);
 
@@ -1018,6 +1027,7 @@ function pages(options, callback) {
 
       function updatePage(callback) {
         page.title = title;
+        page.published = published;
         page.slug = slug;
         page.type = type.name;
 

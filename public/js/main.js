@@ -88,6 +88,14 @@ $.extend(true, window, {
             save: save,
             init: function(callback) {
               populateType();
+              var published = apos.data.aposPages.page.published;
+              if (published === undefined) {
+                published = 1;
+              } else {
+                // Simple POST friendly boolean values
+                published = published ? '1' : '0';
+              }
+              $el.find('[name=published]').val(published);
               $el.find('[name=type]').val(apos.data.aposPages.page.type);
               $el.find('[name=title]').val(apos.data.aposPages.page.title);
               $el.find('[name=slug]').val(slug);
@@ -167,7 +175,8 @@ $.extend(true, window, {
           var data = {
             title: $el.find('[name=title]').val(),
             slug: $el.find('[name=slug]').val(),
-            type: $el.find('[name=type]').val()
+            type: $el.find('[name=type]').val(),
+            published: $el.find('[name=published]').val()
           };
           _.extend(data, { parent: options.parent, originalSlug: options.slug });
           if (type.settings && type.settings.serialize) {
