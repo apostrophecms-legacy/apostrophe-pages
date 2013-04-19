@@ -2,6 +2,7 @@ var async = require('async');
 var _ = require('underscore');
 var extend = require('extend');
 var path = require('path');
+var ent = require('ent');
 
 RegExp.quote = require('regexp-quote');
 
@@ -392,6 +393,7 @@ function pages(options, callback) {
         }
 
         args.content = content;
+        args.safeMode = (req.query.safe_mode !== undefined);
         return res.send(self.decoratePageContent(args));
       }
     };
@@ -430,6 +432,7 @@ function pages(options, callback) {
     if (args.refreshing) {
       return args.content;
     } else {
+
       // This is a temporary, horrible workaround for the lack of
       // conditional extends in nunjucks, allowing us to override
       // something in the outer layout by planting this special
@@ -438,6 +441,19 @@ function pages(options, callback) {
       var match = args.content.match(/<\!\-\- APOS\-BODY\-CLASS (.*?) \-\-\>/);
       if (match) {
         args.bodyClass = match[1];
+      }
+
+      // Another horrible workaround to allow raw HTML slots without the risk
+      // of document.write blowing up a page during a partial update. This horrible
+      // workaround may even be permanent and necessary!
+
+      // [\s\S] is like . but matches newlines too. Great workaround for the lack
+      // of a /s modifier in JavaScript
+      // http://stackoverflow.com/questions/1068280/javascript-regex-multiline-flag-doesnt-work
+      if (!args.safeMode) {
+        args.content = args.content.replace(/<\!\-\- APOS\-RAW\-HTML\-BEFORE \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-START \-\-\>([\s\S]*?)<\!\-\- APOS\-RAW\-HTML\-END \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-AFTER \-\-\>/, function(all, code) {
+        return ent.decode(code);
+        });
       }
 
       if (typeof(options.outerLayout) === 'function') {
