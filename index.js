@@ -349,7 +349,11 @@ function pages(options, callback) {
         if (providePage) {
           req.pushData({
             aposPages: {
-              page: req.bestPage
+              // Prune the page back so we're not sending everything
+              // we know about every event in every widget etc., which
+              // is redundant and results in slow page loads and
+              // high bandwidth usage
+              page: self.prunePage(req.bestPage)
             }
           });
         }
@@ -391,6 +395,16 @@ function pages(options, callback) {
         return res.send(self.decoratePageContent(args));
       }
     };
+  };
+
+  // We send the current page's metadata as inline JSON that winds up in
+  // apos.data.aposPages.page in the browser. It's very helpful for building
+  // page manipulation UI. But we shouldn't redundantly send the areas, as we are already
+  // rendering the ones we care about. And we shouldn't send our relatives
+  // as we're already rendering those as navigation if we want them.
+
+  self.prunePage = function(page) {
+    return _.omit(page, 'areas', 'tabs', 'ancestors', 'children');
   };
 
   // Decorate the contents of args.content as a complete webpage. If args.refreshing is
