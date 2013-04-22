@@ -538,9 +538,6 @@ function pages(options, callback) {
       root: ''
     });
 
-    // _.defaults treats null and undefined the same ):
-    var trash = (options.trash === undefined) ? false : options.trash;
-
     var depth = options.depth;
     // Careful, let them specify a depth of 0 but still have a good default
     if (depth === undefined) {
@@ -551,6 +548,10 @@ function pages(options, callback) {
       path: new RegExp('^' + RegExp.quote(ofPage.path + '/')),
       level: { $gt: ofPage.level, $lte: ofPage.level + depth }
     };
+
+    // _.defaults treats null and undefined the same ):
+    var trash = (options.trash === undefined) ? false : options.trash;
+
     if (trash === true) {
       criteria.trash = true;
     } else if (trash === false) {
@@ -558,6 +559,18 @@ function pages(options, callback) {
     } else if (trash === 'any') {
       // Show both trash and non-trash (reorganize leverages this)
     }
+
+    // _.defaults treats null and undefined the same ):
+    var orphan = (options.orphan === undefined) ? false : options.orphan;
+
+    if (orphan === true) {
+      criteria.orphan = true;
+    } else if (orphan === false) {
+      criteria.orphan = { $exists: false };
+    } else if (orphan === 'any') {
+      // Show both orphans and non-orphans
+    }
+
     apos.pages.find(
       criteria,
       { items: 0 }
@@ -1337,6 +1350,102 @@ function pages(options, callback) {
           return res.send();
         } else {
           return res.send({status: 'ok'});
+        }
+      });
+    });
+
+    // pages.searchLoader is a loader function. If the page type is 'search',
+    // it'll kick in and make search results available in req.extras.search.
+    // You enable this by specifying it when you set your loader option in
+    // calling pages.serve. Include a form on the page template with itself as
+    // the action so you can make queries. (Confused? See the sandbox for
+    // an example.)
+
+    self.searchLoader = function(req, callback) {
+      if (!req.page) {
+        // We're only interested in exact matches, /search/something is
+        // none of our business, we don't look at req.bestPage
+        return callback(null);
+      }
+      // We're only interested in enhancing pages of type "search"
+      if (req.page.type !== 'search') {
+        return callback(null);
+      }
+      var q = req.query.q;
+      req.extras.q = q;
+      // sortify makes it safe as a regex
+      q = apos.sortify(q);
+      q = q.replace(/ /g, '.*?');
+      q = new RegExp(q);
+      var highPages;
+      var lowPages;
+      // TODO: add some more variants considered even better matches, such as
+      // exact word boundaries rather than embedded words. We can afford it,
+      // mongo+node's awfully fast even at this crappy scanning stuff
+      function findHigh(callback) {
+        apos.pages.find({ highSearchText: q }, { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }).limit(100).toArray(function(err, pages) {
+          highPages = pages;
+          return callback(err);
+        });
+      }
+      function findLow(callback) {
+        apos.pages.find({ lowSearchText: q }, { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }).limit(100).toArray(function(err, pages) {
+          lowPages = pages;
+          return callback(err);
+        });
+      }
+      function finish(err) {
+        if (err) {
+          res.statusCode = 500;
+          return res.send(err);
+        }
+        var results = [];
+        var taken = {};
+        _.each(lowPages, function(page) {
+          results.push(page);
+          taken[page.slug] = true;
+        });
+        _.each(highPages, function(page) {
+          if (!taken[page.slug]) {
+            results.push(page);
+            taken[page.slug] = true;
+          }
+        });
+        return self.filterByView(req, results, function(err, pages) {
+          if (err) {
+            return callback(err);
+          } else {
+            req.extras.search = pages;
+            return callback(null);
+          }
+        });
+      }
+      return async.series([findHigh, findLow], finish);
+    };
+
+    app.get('/apos-pages/search-result', function(req, res) {
+      var slug = req.query.slug;
+      return apos.getPage(req, slug, function(err, page) {
+        if (!page) {
+          res.statusCode = 404;
+          return res.send('Not Found');
+        }
+        if (page.slug.match(/\//)) {
+          // TODO this is another place we are hardcoding the root, it is
+          // increasingly clear we don't support more than one root right now
+          return res.redirect(page.slug);
+        } else {
+          // we don't know what to do with this kind of page, but
+          // another module might; emit an event
+          var context = {};
+          apos.emit('searchResult', req, res, page, context);
+          if (!context.accepted) {
+            // No one will admit to knowing what to do with this page
+            res.statusCode = 404;
+            return res.send('Not Found');
+          } else {
+            // Someone else is asynchronously dealing with it, we're good here
+          }
         }
       });
     });
