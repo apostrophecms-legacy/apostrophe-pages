@@ -432,24 +432,26 @@ function pages(options, callback) {
     if (args.refreshing) {
       return args.content;
     } else {
-
-      // This is a temporary, horrible workaround for the lack of
-      // conditional extends in nunjucks, allowing us to override
-      // something in the outer layout by planting this special
-      // comment in the inner layout ow ow ow. Yes we know it's
-      // on us to contribute this feature to nunjucks if we care so much.
-      var match = args.content.match(/<\!\-\- APOS\-BODY\-CLASS (.*?) \-\-\>/);
-      if (match) {
-        args.bodyClass = match[1];
-      }
-
-      // Another horrible workaround to allow raw HTML slots without the risk
-      // of document.write blowing up a page during a partial update. This horrible
-      // workaround may even be permanent and necessary!
+      // This is a bit of a nasty workaround: we need to communicate a few things
+      // to the outer layout, and since it must run as a separate invocation of
+      // nunjucks there's no great way to get them there.
 
       // [\s\S] is like . but matches newlines too. Great workaround for the lack
       // of a /s modifier in JavaScript
       // http://stackoverflow.com/questions/1068280/javascript-regex-multiline-flag-doesnt-work
+
+      var match = args.content.match(/<\!\-\- APOS\-BODY\-CLASS ([\s\S]*?) \-\-\>/);
+      if (match) {
+        args.bodyClass = match[1];
+      }
+      match = args.content.match(/<\!\-\- APOS\-TITLE ([\s\S]*?) \-\-\>/);
+      if (match) {
+        args.title = match[1];
+      }
+
+      // Allow raw HTML slots on a true page update, without the risk
+      // of document.write blowing up a page during a partial update.
+      // This is pretty nasty too, keep thinking about alternatives.
       if (!args.safeMode) {
         args.content = args.content.replace(/<\!\-\- APOS\-RAW\-HTML\-BEFORE \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-START \-\-\>([\s\S]*?)<\!\-\- APOS\-RAW\-HTML\-END \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-AFTER \-\-\>/, function(all, code) {
         return ent.decode(code);
