@@ -1373,10 +1373,8 @@ function pages(options, callback) {
       }
       var q = req.query.q;
       req.extras.q = q;
-      // sortify makes it safe as a regex
-      q = apos.sortify(q);
-      q = q.replace(/ /g, '.*?');
-      q = new RegExp(q);
+      // Turn it into a regular expression
+      q = apos.searchify(q);
       var highPages;
       var lowPages;
       // TODO: add some more variants considered even better matches, such as
