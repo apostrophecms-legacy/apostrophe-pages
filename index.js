@@ -236,6 +236,22 @@ function pages(options, callback) {
             } else {
               return callback(null);
             }
+          },
+          function(callback) {
+            if (options.peers || true) {
+              var ancestors = req.bestPage.ancestors;
+              if (!ancestors.length) {
+                req.bestPage.peers = [ req.bestPage ];
+                return callback(null);
+              }
+              var parent = ancestors[ancestors.length - 1];
+              self.getDescendants(req, parent, options.tabOptions || {}, function(err, pages) {
+                req.bestPage.peers = pages;
+                return callback(err);
+              });
+            } else {
+              return callback(null);
+            }
           }
         ], callback);
       }
@@ -406,7 +422,7 @@ function pages(options, callback) {
   // as we're already rendering those as navigation if we want them.
 
   self.prunePage = function(page) {
-    return _.omit(page, 'areas', 'tabs', 'ancestors', 'children');
+    return _.omit(page, 'areas', 'tabs', 'ancestors', 'children', 'peers');
   };
 
   // Decorate the contents of args.content as a complete webpage. If args.refreshing is
