@@ -342,7 +342,12 @@ function pages(options, callback) {
           return res.redirect(req.redirect);
         }
 
-        if (!req.template) {
+        if (req.notfound) {
+          // A loader asked us to 404
+          res.statusCode = 404;
+          req.template = 'notfound';
+          providePage = false;
+        } else if (!req.template) {
           if (err) {
             req.template = 'serverError';
             res.statusCode = 500;
