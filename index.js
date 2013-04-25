@@ -332,6 +332,16 @@ function pages(options, callback) {
         // whether it is on the allowed list for manual type choices
         // or not. Otherwise implement standard behaviors
 
+        // It's a bit of a hack that we allow loaders to trigger
+        // redirects by stashing a URL in the request object, most would
+        // call that a part of the response. However our pattern so far
+        // has been that the response object is nobody's business but
+        // pages.serve itself so I'm sticking with it for this special case
+
+        if (req.redirect) {
+          return res.redirect(req.redirect);
+        }
+
         if (!req.template) {
           if (err) {
             req.template = 'serverError';
