@@ -1454,6 +1454,11 @@ function pages(options, callback) {
       return async.series([findHigh, findLow], finish);
     };
 
+    // Given a slug that was returned as a search result, generate a redirect
+    // to the appropriate place. The idea is that doing this when users actually
+    // click is much cheaper than determining the perfect URL for every search
+    // result in the list, most of which will never be clicked on
+
     app.get('/apos-pages/search-result', function(req, res) {
       var slug = req.query.slug;
       return apos.getPage(req, slug, function(err, page) {
