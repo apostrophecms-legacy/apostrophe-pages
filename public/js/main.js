@@ -156,7 +156,7 @@ $.extend(true, window, {
           var type = aposPages.getType(typeName);
 
           if (type.settings) {
-            var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._css);
+            var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._typeCss);
             $el.find('[data-type-details]').html($typeEl);
             var typeDefaults = typeData[typeName];
             if (!typeDefaults) {
