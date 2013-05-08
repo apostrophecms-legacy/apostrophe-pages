@@ -77,6 +77,8 @@ describe('apostrophe-pages', function() {
           {
             _id: 'home',
             path: 'home',
+            title: 'Home',
+            sortTitle: 'home',
             level: 0,
             rank: 0,
             slug: '/'
@@ -85,20 +87,28 @@ describe('apostrophe-pages', function() {
           {
             _id: 'contact',
             path: 'home/contact',
+            title: 'Contact',
+            sortTitle: 'contact',
             level: 1,
             rank: 2,
-            slug: '/contact'
+            slug: '/contact',
+            tags: [ 'red', 'green' ]
           },
           {
             _id: 'about',
             path: 'home/about',
+            title: 'About',
+            sortTitle: 'about',
             level: 1,
             rank: 0,
-            slug: '/about'
+            slug: '/about',
+            tags: [ 'green', 'blue' ]
           },
           {
             _id: 'location',
             path: 'home/about/location',
+            title: 'Location',
+            sortTitle: 'location',
             level: 2,
             rank: 1,
             slug: '/about/location'
@@ -106,13 +116,18 @@ describe('apostrophe-pages', function() {
           {
             _id: 'people',
             path: 'home/about/people',
+            title: 'People',
+            sortTitle: 'people',
             level: 2,
             rank: 0,
-            slug: '/about/people'
+            slug: '/about/people',
+            tags: [ 'green' ]
           },
           {
             _id: 'products',
             path: 'home/products',
+            title: 'Products',
+            sortTitle: 'products',
             level: 1,
             rank: 1,
             slug: '/products'
@@ -308,5 +323,32 @@ describe('apostrophe-pages', function() {
     });
   });
 
+  describe('fetch pages by tag', function() {
+    var fetched;
+    it('fetched without error', function(done) {
+      pages.getByTag(req, 'green', function(err, fetchedArg) {
+        if (err) {
+          console.log(err);
+        }
+        assert(!err);
+        fetched = fetchedArg;
+        return done();
+      });
+    });
+    it('fetched three pages', function(done) {
+      assert(fetched.length === 3);
+      return done();
+    });
+    it('first one must be about due to title order', function(done) {
+      assert(fetched[0]._id === 'about');
+      return done();
+    });
+    it('filterByTag returns only contact for "red"', function(done) {
+      var filtered = pages.filterByTag(fetched, 'red');
+      assert(filtered.length === 1);
+      assert(filtered[0]._id === 'contact');
+      return done();
+    });
+  });
 });
 

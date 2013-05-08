@@ -525,10 +525,10 @@ function pages(options, callback) {
         path += '/';
       });
       // Get everything about the related pages except
-      // for their actual items, which would be expensive.
+      // for their actual areas, which would be expensive.
       // Sorting by path works because longer strings sort
       // later than shorter prefixes
-      return apos.pages.find({ path: { $in: paths } }, { items: 0 }).sort( { path: 1 }).toArray(function(err, pages) {
+      return apos.pages.find({ path: { $in: paths } }, { areas: 0 }).sort( { path: 1 }).toArray(function(err, pages) {
         if (err) {
           return callback(err);
         }
@@ -632,6 +632,59 @@ function pages(options, callback) {
           }
         });
         return callback(null, children);
+      });
+    });
+  };
+
+  // Get all pages that have the mentioned tag. 'options' parameter, if present,
+  // may contain an 'areas' flag indicating that the content areas should be returned,
+  // otherwise only metadata is returned. Pages are sorted by rank, which is helpful
+  // if you are using tags to display a subset of child pages and wish to preserve their
+  // natural order. Pages are not returned in a tree structure, pages of any level
+  // may appear anywhere in the result
+  self.getByTag = function(req, tag, options, callback) {
+    return self.getByTags(req, [tag], options, callback);
+  };
+
+  // Get all pages that have at least one of the mentioned tags. 'options' parameter,
+  // if present, may contain an 'areas' flag indicating that the content areas should
+  // be returned, otherwise only metadata is returned.
+  //
+  // Pages are sorted by rank, which is helpful if you are using tags to display a subset
+  // of child pages and wish to preserve their natural order. Pages are not returned in a tree
+  // structure, pages of any level may appear anywhere in the result
+  self.getByTags = function(req, tags, options, callback) {
+    if (!callback) {
+      callback = options;
+      options = {};
+    }
+    var projection;
+    if (options.areas) {
+      projection = {};
+    } else {
+      projection = { areas: 0 };
+    }
+    var criteria = { path: { $exists: 1 }, tags: { $in: tags }};
+    return apos.pages.find(criteria).sort({ sortTitle: 1 }).toArray(function(err, pages) {
+      if (err) {
+        return callback(err);
+      }
+      return self.filterByView(req, pages, callback);
+    });
+  };
+
+  // Filter the pages array to those pages that have the specified tag. Returns directly,
+  // has no callback
+  self.filterByTag = function(pages, tag) {
+    return self.filterByTags(pages, [tag]);
+  };
+
+  // Filter the pages array to those pages that have at least one of the specified tags.
+  // Returns directly, has no callback
+  self.filterByTags = function(pages, tags) {
+    return _.filter(pages, function(page) {
+      return page.tags && _.some(page.tags, function(tag) {
+        return _.contains(tags, tag);
       });
     });
   };
@@ -1009,7 +1062,7 @@ function pages(options, callback) {
       // randomly, the page tree is not destroyed. But we should have a
       // cleanup task or a lock mechanism
       function getNextRank(callback) {
-        self.getDescendants(req, parent, { depth: 1}, function(err, children) {
+        self.getDescendants(req, parent, { depth: 1 }, function(err, children) {
           if (err) {
             return callback(err);
           }

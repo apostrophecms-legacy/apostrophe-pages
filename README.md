@@ -53,8 +53,8 @@ this:
     home/about/staff
 
 The path always reflects the relationship between the pages no
-matter what the slug may be changed to by the user. (Clients routinely 
-shorten slugs to make URLs easier to publish in print, but don't want to 
+matter what the slug may be changed to by the user. (Clients routinely
+shorten slugs to make URLs easier to publish in print, but don't want to
 lose the relationships between pages.)
 
 Note that paths do not have a leading /. Multiple roots are permitted,
@@ -78,9 +78,9 @@ In this case your callback still receives an array of the immediate children of 
 
 For performance reasons, `pages.getAncestors` and `pages.getDescendants` do not return the `items` property. Typically only the `slug` and `title` properties are necessary to build navigation. If necessary you may use the slug property of a page to fetch the entire page with its items, via `apos.getPage`.
 
-### Fetching Ancestors and Descendants Automatically ###
+### Fetching Ancestors, Peers and Descendants Automatically ###
 
-`pages.serve` automatically fetches the ancestors of the page into the `ancestors` property of the `page` object given to the page template. In addition, the children of the page are available in the `children` property. And the children of the home page (whether the current page is the home page or not) are available in the `tabs` property.
+`pages.serve` automatically fetches the ancestors of the page into the `ancestors` property of the `page` object given to the page template. In addition, the children of the page are available in the `children` property. And the children of the home page (whether the current page is the home page or not) are available in the `tabs` property. Also, the peers of the current page (children of the same parent) are available in the `peers` property.
 
 If you need to see the descendants of the current page to a greater depth, set the `descendantOptions` option when calling `pages.serve`:
 
@@ -107,6 +107,31 @@ You can also shut off ancestors, descendants or tabs entirely if you're not inte
       tabs: false,
       descendants: false,
     }
+
+### Fetching Pages by Tag ###
+
+Typically "tree pages" (pages that are part of the tree, i.e. the home page and its descendants) are displayed and browsed like nested folders. But from time to time it is useful to fetch pages based on taxonomy instead.
+
+The `pages.getByTag` method returns *all tree pages on the site* that have a specified tag:
+
+    pages.getByTag(req, 'green', function(err, results) { ... });
+
+And `pages.getByTags` returns all pages with at least one of the tags in an array:
+
+    pages.getByTags(req, ['green', 'blue'], function(err, results) { ... });
+
+When pages are fetched by tag, they are sorted alphabetically by title.
+
+### Filtering Pages by Tag ###
+
+If you already have an array of pages, for instance the children or peers of the current page, it can be useful to filter them by tag. You can do that with `pages.filterByTag`:
+
+    pages.filterByTag(children, 'tag')
+    pages.filterByTags(children, ['green', 'blue'])
+
+Again, `filterByTags` returns pages with *at least one* of the specified tags.
+
+*Note that these functions do not take a callback.* They return the pages directly, since they are just filtering an existing array of pages based on their metadata.
 
 ## Loading Additional Data
 
