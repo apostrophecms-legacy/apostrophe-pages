@@ -971,6 +971,7 @@ function pages(options, callback) {
       var type;
       var nextRank;
       var published;
+      var tags;
 
       title = req.body.title.trim();
       // Validation is annoying, automatic cleanup is awesome
@@ -979,7 +980,7 @@ function pages(options, callback) {
       }
 
       published = apos.sanitizeBoolean(req.body.published, true);
-
+      tags = apos.sanitizeTags(req.body.tags);
       type = determineType(req);
 
       async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
@@ -1024,7 +1025,7 @@ function pages(options, callback) {
       }
 
       function insertPage(callback) {
-        page = { title: title, published: published, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+        page = { title: title, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
         addSanitizedTypeData(req, page, type, putPage);
         function putPage(err) {
           if (err) {
@@ -1050,6 +1051,7 @@ function pages(options, callback) {
       var slug;
       var title;
       var published;
+      var tags;
       var type;
 
       title = req.body.title.trim();
@@ -1059,6 +1061,7 @@ function pages(options, callback) {
       }
 
       published = apos.sanitizeBoolean(req.body.published, true);
+      tags = apos.sanitizeTags(req.body.tags);
 
       type = determineType(req);
 
@@ -1105,6 +1108,7 @@ function pages(options, callback) {
         page.title = title;
         page.published = published;
         page.slug = slug;
+        page.tags = tags;
         page.type = type.name;
 
         if ((slug !== originalSlug) && (originalSlug === '/')) {

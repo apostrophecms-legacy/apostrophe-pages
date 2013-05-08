@@ -101,6 +101,8 @@ $.extend(true, window, {
               $el.find('[name=type]').val(apos.data.aposPages.page.type);
               $el.find('[name=title]').val(apos.data.aposPages.page.title);
               $el.find('[name=slug]').val(slug);
+              $el.find('[name=tags]').val(apos.tagsToString(apos.data.aposPages.page.tags));
+
               refreshType();
 
               // Watch the title for changes, update the slug - but only if
@@ -178,7 +180,8 @@ $.extend(true, window, {
             title: $el.find('[name=title]').val(),
             slug: $el.find('[name=slug]').val(),
             type: $el.find('[name=type]').val(),
-            published: $el.find('[name=published]').val()
+            published: $el.find('[name=published]').val(),
+            tags: apos.tagsToArray($el.find('[name="tags"]').val())
           };
           _.extend(data, { parent: options.parent, originalSlug: options.slug });
           if (type.settings && type.settings.serialize) {

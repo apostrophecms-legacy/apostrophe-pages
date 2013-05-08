@@ -1,27 +1,14 @@
+{% include 'formMacros.html' %}
+
 <div class="apos-page-settings apos-modal apos-template {% block class %}apos-new-page-settings{% endblock %}">
   <h3>{% block action %}New Page{% endblock %}</h3>
   <div class="apos-modal-body">
     <form>
-      <fieldset class="apos-fieldset apos-fieldset-text">
-        <label>Title</label>
-        <input name="title" type="text" />
-      </fieldset>
-      <fieldset class="apos-fieldset apos-fieldset-select">
-        <label>Type</label>
-        <div class="apos-control apos-menu-style apos-menu">
-          <select class="apos-menu-select" name="type">
-          </select>
-        </div>
-      </fieldset>
-      <fieldset class="apos-fieldset apos-fieldset-select">
-        <label>Published</label>
-        <div class="apos-control apos-menu-style apos-menu">
-          <select class="apos-menu-select" name="published">
-            <option value="1" selected>Yes</option>
-            <option value="0">No</option>
-          </select>
-        </div>
-      </fieldset>
+      {{ formText('title', 'Title') }}
+      {# JS will populate it #}
+      {{ formSelect('type', 'Type', []) }}
+      {{ formBoolean('published', 'Published') }}
+      {{ formTags('tags', 'Tags') }}
       {# js populates this as needed, for instance blog pages have extra settings #}
       <div data-type-details></div>
     </form>
