@@ -199,7 +199,6 @@ function pages(options, callback) {
         }
       }
 
-
       function relatives(callback) {
         if(!req.bestPage) {
           return callback(null);
