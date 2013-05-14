@@ -211,6 +211,10 @@ function pages(options, callback) {
             if (options.ancestors || options.tabs || true) {
               return self.getAncestors(req, req.bestPage, options.ancestorOptions || {}, function(err, ancestors) {
                 req.bestPage.ancestors = ancestors;
+                if (ancestors.length) {
+                  // Also set parent as a convenience
+                  req.bestPage.parent = req.bestPage.ancestors.slice(-1)[0];
+                }
                 return callback(err);
               });
             } else {
