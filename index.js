@@ -403,7 +403,10 @@ function pages(options, callback) {
           user: req.user,
           calls: apos.getGlobalCalls() + apos.getCalls(req),
           data: apos.getGlobalData() + apos.getData(req),
-          refreshing: !!req.query.apos_refresh
+          refreshing: !!req.query.apos_refresh,
+          // Make the query available to templates for easy access to
+          // filter settings etc.
+          query: req.query
         };
 
         _.defaults(args, req.extras);
