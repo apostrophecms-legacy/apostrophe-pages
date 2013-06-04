@@ -393,6 +393,12 @@ function pages(options, callback) {
           });
         }
 
+        var when = req.user ? 'user' : 'anon';
+        var calls = apos.getGlobalCallsWhen('always');
+        if (when === 'user') {
+          calls = calls.concat(apos.getGlobalCallsWhen('user'));
+        }
+        calls = calls.concat(apos.getCalls(req));
         var args = {
           edit: req.edit,
           // Make sure we pass the slug of the page, not the
@@ -401,7 +407,8 @@ function pages(options, callback) {
           slug: providePage ? req.bestPage.slug : null,
           page: providePage ? req.bestPage : null,
           user: req.user,
-          calls: apos.getGlobalCalls() + apos.getCalls(req),
+          when: req.user ? 'user' : 'anon',
+          calls: calls,
           data: apos.getGlobalData() + apos.getData(req),
           refreshing: !!req.query.apos_refresh,
           // Make the query available to templates for easy access to
@@ -431,7 +438,12 @@ function pages(options, callback) {
 
         args.content = content;
         args.safeMode = (req.query.safe_mode !== undefined);
-        return res.send(self.decoratePageContent(args));
+        // AJAX requests never get an outer layout
+        if (req.xhr) {
+          return res.send(content);
+        } else {
+          return res.send(self.decoratePageContent(args));
+        }
       }
     };
   };
@@ -923,7 +935,7 @@ function pages(options, callback) {
 
   self.addType = function(type) {
     self.types.push(type);
-    apos.pushGlobalCall('aposPages.addType(?)', { name: type.name, label: type.label });
+    apos.pushGlobalCallWhen('user', 'aposPages.addType(?)', { name: type.name, label: type.label });
   };
 
   // Call this last, AFTER adding all the page types, and only if you do not want
@@ -967,7 +979,7 @@ function pages(options, callback) {
         types: []
       }
     });
-    apos.pushGlobalCall('aposPages.enableUI()', options.uiOptions || {});
+    apos.pushGlobalCallWhen('user', 'aposPages.enableUI()', options.uiOptions || {});
   }
 
   // This pushes more entries browser side as well
@@ -1009,18 +1021,25 @@ function pages(options, callback) {
   // browser-side UI assets for managing pages
 
   if (options.ui) {
-    self.pushAsset = function(type, name) {
-      return apos.pushAsset(type, name, __dirname, '/apos-pages');
+    self.pushAsset = function(type, name, options) {
+      // TODO should probably support a chain of subclasses like
+      // the snippet modules do
+      if (!options) {
+        options = {};
+      }
+      options.fs = __dirname;
+      options.web = '/apos-pages';
+      return apos.pushAsset(type, name, options);
     };
 
-    self.pushAsset('script', 'jqtree');
-    self.pushAsset('stylesheet', 'jqtree');
-    self.pushAsset('script', 'main');
-    self.pushAsset('stylesheet', 'main');
-    self.pushAsset('template', 'newPageSettings');
-    self.pushAsset('template', 'editPageSettings');
-    self.pushAsset('template', 'reorganize');
-    self.pushAsset('template', 'pageVersions');
+    self.pushAsset('script', 'jqtree', { when: 'user' });
+    self.pushAsset('stylesheet', 'jqtree', { when: 'user' });
+    self.pushAsset('script', 'editor', { when: 'user' });
+    self.pushAsset('stylesheet', 'editor', { when: 'user' });
+    self.pushAsset('template', 'newPageSettings', { when: 'user' });
+    self.pushAsset('template', 'editPageSettings', { when: 'user' });
+    self.pushAsset('template', 'reorganize', { when: 'user' });
+    self.pushAsset('template', 'pageVersions', { when: 'user' });
 
     app.post('/apos-pages/new', function(req, res) {
       var parent;
