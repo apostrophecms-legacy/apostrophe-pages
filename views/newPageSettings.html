@@ -8,6 +8,10 @@
       {# JS will populate it #}
       {{ formSelect('type', 'Type', []) }}
       {{ formBoolean('published', 'Published') }}
+      {# We don't allow the slug to be edited for a brand new post, #}
+      {# but provide a block the edit template can override #}
+      {% block slug %}
+      {% endblock %}
       {{ formTags('tags', 'Tags') }}
       {# js populates this as needed, for instance blog pages have extra settings #}
       <div data-type-details></div>

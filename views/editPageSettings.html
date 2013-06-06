@@ -1,20 +1,8 @@
 {% include 'formMacros.html' %}
-<div class="apos-page-settings apos-modal apos-template {% block class %}apos-edit-page-settings{% endblock %}">
-  <h3>{% block action %}Edit Page{% endblock %}</h3>
-  <div class="apos-modal-body">
-    <form>
-      {{ formText('title', 'Title') }}
-      {# JS will populate it #}
-      {{ formSelect('type', 'Type', []) }}
-      {{ formBoolean('published', 'Published') }}
-      {{ formText('slug', 'Slug') }}
-      {{ formTags('tags', 'Tags') }}
-      {# js populates this as needed, for instance blog pages have extra settings #}
-      <div data-type-details></div>
-    </form>
-  </div>
-  <div class="apos-modal-footer">
-    <a href="#" data-action="save" class="apos-control apos-button apos-save">Save</a>
-    <a href="#" data-action="dismiss" class="apos-control apos-button apos-cancel">Cancel</a>
-  </div>
-</div>
+{% extends 'newPageSettings.html' %}
+
+{% block class %}apos-edit-page-settings{% endblock %}
+{% block action %}Edit Page{% endblock %}
+{% block slug %}
+  {{ formText('slug', 'Slug') }}
+{% endblock %}
