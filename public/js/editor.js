@@ -71,7 +71,21 @@ $.extend(true, window, {
           $el = apos.modalFromTemplate('.apos-new-page-settings', {
             init: function(callback) {
               populateType();
+              // Copy parent's published status
+              //
+              // TODO: refactor this frequently used dance of boolean values
+              // into editor.js or content.js
+              var published = apos.data.aposPages.page.published;
+              if (published === undefined) {
+                published = 1;
+              } else {
+                // Simple POST friendly boolean values
+                published = published ? '1' : '0';
+              }
               refreshType();
+              // $el.findByName('published').val(apos.data.pages.parent.published)
+              // Copy parent permissions
+              enablePermissions(apos.data.aposPages.page);
               return callback(null);
             },
             save: save
@@ -104,6 +118,8 @@ $.extend(true, window, {
               $el.find('[name=tags]').val(apos.tagsToString(apos.data.aposPages.page.tags));
 
               refreshType();
+
+              enablePermissions(apos.data.aposPages.page);
 
               // Watch the title for changes, update the slug - but only if
               // the slug was in sync with the title to start with
@@ -176,6 +192,7 @@ $.extend(true, window, {
         function addOrEdit(action, options, callback) {
           var typeName = $el.find('[name=type]').val();
           var type = aposPages.getType(typeName);
+
           var data = {
             title: $el.find('[name=title]').val(),
             slug: $el.find('[name=slug]').val(),
@@ -183,6 +200,16 @@ $.extend(true, window, {
             published: $el.find('[name=published]').val(),
             tags: apos.tagsToArray($el.find('[name="tags"]').val())
           };
+
+          // Permissions are fancy! But the server does most of the hard work
+          data.loginRequired = $el.findByName('loginRequired').val();
+          data.loginRequiredPropagate = $el.findByName('loginRequiredPropagate').is(':checked') ? '1' : '0';
+          // "certain people" (specific users/groups)
+          data.viewGroupIds = $el.find('[data-name="viewGroupIds"]').selective('get');
+          data.viewPersonIds = $el.find('[data-name="viewPersonIds"]').selective('get');
+          data.editGroupIds = $el.find('[data-name="editGroupIds"]').selective('get');
+          data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get');
+
           _.extend(data, { parent: options.parent, originalSlug: options.slug });
           if (type.settings && type.settings.serialize) {
             data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
@@ -204,6 +231,71 @@ $.extend(true, window, {
           );
           return false;
         }
+
+        function enablePermissions(page) {
+          // Admin users can't manipulate edit permissions. (Hackers could try, but the server
+          // ignores anything submitted.)
+
+          if (!apos.data.permissions.admin) {
+            $el.find('[data-edit-permissions-container]').hide();
+          }
+
+          $el.find('[data-show-view-permissions]').click(function() {
+            $(this).closest('.apos-page-settings-toggle').toggleClass('apos-active');
+            $el.find('.apos-view-permissions').toggle();
+            return false;
+          });
+
+          var $loginRequired = $el.findByName('loginRequired');
+          $loginRequired.val(page.loginRequired);
+          $loginRequired.change(function() {
+            var $certainPeople = $el.find('.apos-view-certain-people');
+            if ($(this).val() == 'certainPeople') {
+              $certainPeople.show();
+            } else {
+              $certainPeople.hide();
+            }
+          }).trigger('change');
+
+          $el.find('[data-show-edit-permissions]').click(function() {
+            $(this).closest('.apos-page-settings-toggle').toggleClass('apos-active');
+            $el.find('.apos-edit-permissions').toggle();
+            return false;
+          });
+
+          // TODO this is a hardcoded dependency on the people and
+          // groups modules, think about whether that is acceptable
+
+          $el.find('[data-name="viewGroupIds"]').selective({
+            // Unpublished people and groups can still have permissions
+            source: '/apos-groups/autocomplete?published=any',
+            data: page.viewGroupIds || [],
+            propagate: true,
+            preventDuplicates: true
+          });
+
+          $el.find('[data-name="viewPersonIds"]').selective({
+            source: '/apos-people/autocomplete?published=any',
+            data: page.viewPersonIds || [],
+            propagate: true,
+            preventDuplicates: true
+          });
+
+          $el.find('[data-name="editGroupIds"]').selective({
+            source: '/apos-groups/autocomplete?published=any',
+            data: page.editGroupIds || [],
+            propagate: true,
+            preventDuplicates: true
+          });
+
+          $el.find('[data-name="editPersonIds"]').selective({
+            source: '/apos-people/autocomplete?published=any',
+            data: page.editPersonIds || [],
+            propagate: true,
+            preventDuplicates: true
+          });
+        }
+
       })();
 
       $('body').on('click', '[data-reorganize-page]', function() {
@@ -230,18 +322,15 @@ $.extend(true, window, {
                   target: e.move_info.target_node.slug,
                   position: e.move_info.position
               };
-              apos.log('ajax call beginning');
               $.ajax({
                 url: '/apos-pages/move-jqtree',
                 data: data,
                 type: 'POST',
                 dataType: 'json',
                 success: function() {
-                  apos.log('success called');
                   e.move_info.do_move();
                 },
                 error: function() {
-                  apos.log('error called');
                   // This didn't work, probably because something
                   // else has changed in the page tree. Refreshing
                   // is an appropriate response

@@ -16,7 +16,7 @@ var about;
 
 var contact;
 
-var req = {};
+var req = apos.getTaskReq();
 
 // TODO: test 'before' position for move(), test conflicting paths and slugs
 
@@ -81,7 +81,8 @@ describe('apostrophe-pages', function() {
             sortTitle: 'home',
             level: 0,
             rank: 0,
-            slug: '/'
+            slug: '/',
+            published: true
           },
           // Kids in scrambled order so sort() has work to do
           {
@@ -92,7 +93,8 @@ describe('apostrophe-pages', function() {
             level: 1,
             rank: 2,
             slug: '/contact',
-            tags: [ 'red', 'green' ]
+            tags: [ 'red', 'green' ],
+            published: true
           },
           {
             _id: 'about',
@@ -102,7 +104,8 @@ describe('apostrophe-pages', function() {
             level: 1,
             rank: 0,
             slug: '/about',
-            tags: [ 'green', 'blue' ]
+            tags: [ 'green', 'blue' ],
+            published: true
           },
           {
             _id: 'location',
@@ -111,7 +114,8 @@ describe('apostrophe-pages', function() {
             sortTitle: 'location',
             level: 2,
             rank: 1,
-            slug: '/about/location'
+            slug: '/about/location',
+            published: true
           },
           {
             _id: 'people',
@@ -121,7 +125,8 @@ describe('apostrophe-pages', function() {
             level: 2,
             rank: 0,
             slug: '/about/people',
-            tags: [ 'green' ]
+            tags: [ 'green' ],
+            published: true
           },
           {
             _id: 'products',
@@ -130,7 +135,8 @@ describe('apostrophe-pages', function() {
             sortTitle: 'products',
             level: 1,
             rank: 1,
-            slug: '/products'
+            slug: '/products',
+            published: true
           }
         ], function(err) {
           assert(!err);
@@ -331,7 +337,7 @@ describe('apostrophe-pages', function() {
           console.log(err);
         }
         assert(!err);
-        fetched = fetchedArg;
+        fetched = fetchedArg.pages;
         return done();
       });
     });

@@ -280,7 +280,10 @@ function pages(options, callback) {
         loadList = loadList.map(function(item) {
           if (typeof(item) !== 'function') {
             return function(callback) {
-              apos.getPage(req, item, function(err, page) {
+              // Hardcoded slugs of virtual pages to be loaded for every user every time
+              // imply we're not concerned with permissions. Avoiding them saves us the
+              // hassle of precreating pages like "global" just to set published: true etc.
+              apos.getPage(req, item, { permissions: false }, function(err, page) {
                 if (err) {
                   return callback(err);
                 }
@@ -393,12 +396,21 @@ function pages(options, callback) {
           });
         }
 
+        req.pushData({
+          permissions: (req.user && req.user.permissions) || {}
+        });
+
         var when = req.user ? 'user' : 'anon';
         var calls = apos.getGlobalCallsWhen('always');
         if (when === 'user') {
-          calls = calls.concat(apos.getGlobalCallsWhen('user'));
+          calls = calls + apos.getGlobalCallsWhen('user');
         }
-        calls = calls.concat(apos.getCalls(req));
+        calls = calls + apos.getCalls(req);
+        // Always the last call; signifies we're done initializing the main content area
+        // as far as the core is concerned; a lovely time for other modules and project-level
+        // javascript to do their own enhancements
+        calls += '\n$("body").trigger("aposReady");\n';
+
         var args = {
           edit: req.edit,
           // Make sure we pass the slug of the page, not the
@@ -407,6 +419,7 @@ function pages(options, callback) {
           slug: providePage ? req.bestPage.slug : null,
           page: providePage ? req.bestPage : null,
           user: req.user,
+          permissions: (req.user && req.user.permissions) || {},
           when: req.user ? 'user' : 'anon',
           calls: calls,
           data: apos.getGlobalData() + apos.getData(req),
@@ -542,18 +555,18 @@ function pages(options, callback) {
         paths.push(path);
         path += '/';
       });
-      // Get everything about the related pages except
-      // for their actual areas, which would be expensive.
+      // Get metadata about the related pages, skipping expensive stuff.
       // Sorting by path works because longer strings sort
       // later than shorter prefixes
-      return apos.pages.find({ path: { $in: paths } }, { areas: 0 }).sort( { path: 1 }).toArray(function(err, pages) {
+      return apos.get(req, { path: { $in: paths } }, { fields: { areas: 0, lowSearchText: 0, highSearchText: 0, searchSummary: 0 }, sort: { path: 1 } }, function(err, results) {
         if (err) {
           return callback(err);
         }
+        var pages = results.pages;
         _.each(pages, function(page) {
           page.url = options.root + page.slug;
         });
-        return self.filterByView(req, pages, callback);
+        return callback(null, pages);
       });
     }
     return callback(null);
@@ -573,21 +586,28 @@ function pages(options, callback) {
   };
 
   // You may skip the options parameter and pass just page and callback.
-  // The 'trash' option controls whether pages with the trash flag are
+  //
+  // The `trash` option controls whether pages with the trash flag are
   // included. If true, only trash is returned. If false, only non-trash
   // is returned. If null, both are returned. false is the default.
+  //
+  // The `orphan` option works the same way. `orphan` pages are
+  // normally accessible, but are snot shown in subnav, tabs, etc., so
+  // this is the only method for which `orphan` defaults to false.
 
-  self.getDescendants = function(req, ofPage, options, callback) {
+  self.getDescendants = function(req, ofPage, optionsArg, callback) {
     if (!callback) {
-      callback = options;
-      options = {};
+      callback = optionsArg;
+      optionsArg = {};
     }
-    if(!options) {
-      options = {};
-    }
+    var options = {};
+    extend(true, options, optionsArg);
     _.defaults(options, {
       root: ''
     });
+    if (options.orphan === undefined) {
+      options.orphan = false;
+    }
 
     var depth = options.depth;
     // Careful, let them specify a depth of 0 but still have a good default
@@ -600,57 +620,32 @@ function pages(options, callback) {
       level: { $gt: ofPage.level, $lte: ofPage.level + depth }
     };
 
-    // _.defaults treats null and undefined the same ):
-    var trash = (options.trash === undefined) ? false : options.trash;
-
-    if (trash === true) {
-      criteria.trash = true;
-    } else if (trash === false) {
-      criteria.trash = { $exists: false };
-    } else if (trash === 'any') {
-      // Show both trash and non-trash (reorganize leverages this)
-    }
-
-    // _.defaults treats null and undefined the same ):
-    var orphan = (options.orphan === undefined) ? false : options.orphan;
-
-    if (orphan === true) {
-      criteria.orphan = true;
-    } else if (orphan === false) {
-      criteria.orphan = { $exists: false };
-    } else if (orphan === 'any') {
-      // Show both orphans and non-orphans
-    }
-
-    apos.pages.find(
-      criteria,
-      { items: 0 }
-    ).
-    sort( { level: 1, rank: 1 } ).
-    toArray(function(err, pages) {
+    // Skip expensive things
+    options.fields = { areas: 0, lowSearchText: 0, highSearchText: 0, searchSummary: 0 };
+    options.sort = { level: 1, rank: 1 };
+    apos.get(req, criteria, options, function(err, results) {
       if (err) {
         return callback(err);
       }
-      return self.filterByView(req, pages, function(err, pages) {
-        var children = [];
-        var pagesByPath = {};
-        _.each(pages, function(page) {
-          page.children = [];
-          page.url = options.root + page.slug;
-          pagesByPath[page.path] = page;
-          var last = page.path.lastIndexOf('/');
-          var parentPath = page.path.substr(0, last);
-          if (pagesByPath[parentPath]) {
-            pagesByPath[parentPath].children.push(page);
-          } else if (page.level === (ofPage.level + 1)) {
-            children.push(page);
-          } else {
-            // The parent of this page is hidden from us, so we shouldn't
-            // include this page in the results as viewed from here
-          }
-        });
-        return callback(null, children);
+      var pages = results.pages;
+      var children = [];
+      var pagesByPath = {};
+      _.each(pages, function(page) {
+        page.children = [];
+        page.url = options.root + page.slug;
+        pagesByPath[page.path] = page;
+        var last = page.path.lastIndexOf('/');
+        var parentPath = page.path.substr(0, last);
+        if (pagesByPath[parentPath]) {
+          pagesByPath[parentPath].children.push(page);
+        } else if (page.level === (ofPage.level + 1)) {
+          children.push(page);
+        } else {
+          // The parent of this page is hidden from us, so we shouldn't
+          // include this page in the results as viewed from here
+        }
       });
+      return callback(null, children);
     });
   };
 
@@ -683,11 +678,15 @@ function pages(options, callback) {
       projection = { areas: 0 };
     }
     var criteria = { path: { $exists: 1 }, tags: { $in: tags }};
-    return apos.pages.find(criteria).sort({ sortTitle: 1 }).toArray(function(err, pages) {
+    return apos.get(req, criteria, {}, function(err, results) {
       if (err) {
         return callback(err);
       }
-      return self.filterByView(req, pages, callback);
+      var pages;
+      if (results) {
+        pages = results.pages;
+      }
+      return callback(null, results);
     });
   };
 
@@ -1075,7 +1074,7 @@ function pages(options, callback) {
       }
 
       function permissions(callback) {
-        return apos.permissions(req, 'manage-page', parent, function(err) {
+        return apos.permissions(req, 'edit-page', parent, function(err) {
           // If there is no permissions error then note that we are cool
           // enough to manage the page
           return callback(err);
@@ -1087,7 +1086,7 @@ function pages(options, callback) {
       // randomly, the page tree is not destroyed. But we should have a
       // cleanup task or a lock mechanism
       function getNextRank(callback) {
-        self.getDescendants(req, parent, { depth: 1 }, function(err, children) {
+        self.getDescendants(req, parent, { depth: 1, orphan: 'any', trash: 'any' }, function(err, children) {
           if (err) {
             return callback(err);
           }
@@ -1104,13 +1103,29 @@ function pages(options, callback) {
 
       function insertPage(callback) {
         page = { title: title, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
-        addSanitizedTypeData(req, page, type, putPage);
-        function putPage(err) {
+
+        // Permissions initially match those of the parent
+        page.viewGroupIds = parent.viewGroupIds;
+        page.viewPersonIds = parent.viewPersonIds;
+        page.editGroupIds = parent.editGroupIds;
+        page.editPersonIds = parent.editPersonIds;
+        if (parent.loginRequired) {
+          page.loginRequired = parent.loginRequired;
+        }
+
+        self.applyPermissions(req, page, function(err) {
           if (err) {
             return callback(err);
           }
-          apos.putPage(req, page.slug, page, callback);
-        }
+
+          addSanitizedTypeData(req, page, type, putPage);
+          function putPage(err) {
+            if (err) {
+              return callback(err);
+            }
+            apos.putPage(req, page.slug, page, callback);
+          }
+        });
       }
 
       function sendPage(err) {
@@ -1174,10 +1189,9 @@ function pages(options, callback) {
       }
 
       function permissions(callback) {
-        return apos.permissions(req, 'edit', page, function(err) {
-          // If there is no permissions error then note that we are cool
+        return apos.permissions(req, 'edit-page', page, function(err) {
+          // If there is no permissions error then we are cool
           // enough to edit the page
-          console.log(err);
           return callback(err);
         });
       }
@@ -1201,7 +1215,12 @@ function pages(options, callback) {
             console.log(err);
             return callback(err);
           }
-          return apos.putPage(req, originalSlug, page, callback);
+          self.applyPermissions(req, page, function(err) {
+            if (err) {
+              return callback(err);
+            }
+            return apos.putPage(req, originalSlug, page, callback);
+          });
         }
       }
 
@@ -1225,6 +1244,95 @@ function pages(options, callback) {
       }
     });
 
+    self.applyPermissions = function(req, page, callback) {
+      var fields = [ 'viewGroupIds', 'viewPersonIds' ];
+
+      // Only admins can change editing permissions.
+      //
+      // TODO I should be checking this as a named permission in its own right
+
+      var userPermissions = req.user && req.user.permissions;
+      if (userPermissions.admin) {
+        fields.concat([ 'editGroupIds', 'editPersonIds' ]);
+      }
+
+      var propagatePull;
+      var propagateAdd;
+      var propagateSet;
+      var propagateUnset;
+      var loginRequired = apos.sanitizeSelect(req.body.loginRequired, [ '', 'loginRequired', 'certainPeople' ], '');
+      if (loginRequired === '') {
+        delete page.loginRequired;
+      } else {
+        page.loginRequired = loginRequired;
+      }
+      if (apos.sanitizeBoolean(req.body.loginRequiredPropagate)) {
+        if (loginRequired !== '') {
+          propagateSet = { loginRequired: loginRequired };
+        } else {
+          propagateUnset = { loginRequired: 1 };
+        }
+      }
+
+      _.each(fields, function(field) {
+        page[field] = [];
+        _.each(req.body[field], function(datum) {
+          if (typeof(datum) !== 'object') {
+            return;
+          }
+          var removed = apos.sanitizeBoolean(datum.removed);
+          var propagate = apos.sanitizeBoolean(datum.propagate);
+          if (removed) {
+            if (propagate) {
+              if (!propagatePull) {
+                propagatePull = {};
+              }
+              if (!propagatePull[field]) {
+                propagatePull[field] = [];
+              }
+              propagatePull[field].push(datum.value);
+            }
+          } else {
+            if (propagate) {
+              if (!propagateAdd) {
+                propagateAdd = {};
+              }
+              if (!propagateAdd[field]) {
+                propagateAdd[field] = [];
+              }
+              propagateAdd[field].push(datum.value);
+            }
+            page[field].push(datum.value);
+            page.certainPeople = true;
+          }
+        });
+      });
+      if (propagatePull || propagateAdd || propagateSet || propagateUnset) {
+        var command = {};
+        if (propagatePull) {
+          command.$pull = { };
+          _.each(propagatePull, function(values, field) {
+            command.$pull[field] = { $in: values };
+          });
+        }
+        if (propagateAdd) {
+          command.$addToSet = { };
+          _.each(propagateAdd, function(values, field) {
+            command.$addToSet[field] = { $each: values };
+          });
+        }
+        if (propagateSet) {
+          command.$set = propagateSet;
+        }
+        if (propagateUnset) {
+          command.$unset = propagateUnset;
+        }
+        apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, callback);
+      } else {
+        return callback(null);
+      }
+    };
+
     // Move page to trashcan
     app.post('/apos-pages/delete', function(req, res) {
       var trash;
@@ -1245,8 +1353,9 @@ function pages(options, callback) {
       }
 
       function findPage(callback) {
-        apos.pages.findOne({ slug: req.body.slug }, function(err, pageArg) {
-          if (err || (!pageArg)) {
+        // Also checks permissions
+        apos.get(req, { slug: req.body.slug }, { editable: true }, function(err, results) {
+          if (err || (!results.pages.length)) {
             return callback('Page not found');
           }
           page = pageArg;
@@ -1292,7 +1401,7 @@ function pages(options, callback) {
           label: page.title
         };
         // trash: 'any' means return both trash and non-trash
-        self.getDescendants(req, page, { depth: 1000, trash: 'any' }, function(err, children) {
+        self.getDescendants(req, page, { depth: 1000, trash: 'any', orphan: 'any' }, function(err, children) {
           page.children = children;
           // jqtree supports more than one top level node, so we have to pass an array
           data = [ pageToJqtree(page) ];
@@ -1496,14 +1605,20 @@ function pages(options, callback) {
       // exact word boundaries rather than embedded words. We can afford it,
       // mongo+node's awfully fast even at this crappy scanning stuff
       function findHigh(callback) {
-        apos.pages.find({ highSearchText: q }, { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }).limit(100).toArray(function(err, pages) {
-          highPages = pages;
+        apos.get(req, { highSearchText: q }, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }, limit: 100 }, function(err, results) {
+          if (err) {
+            return callback(err);
+          }
+          highPages = results.pages;
           return callback(err);
         });
       }
       function findLow(callback) {
-        apos.pages.find({ lowSearchText: q }, { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }).limit(100).toArray(function(err, pages) {
-          lowPages = pages;
+        apos.get(req, { lowSearchText: q }, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }, limit: 100 }, function(err, results) {
+          if (err) {
+            return callback(err);
+          }
+          lowPages = results.pages;
           return callback(err);
         });
       }
@@ -1524,14 +1639,7 @@ function pages(options, callback) {
             taken[page.slug] = true;
           }
         });
-        return self.filterByView(req, results, function(err, pages) {
-          if (err) {
-            return callback(err);
-          } else {
-            req.extras.search = pages;
-            return callback(null);
-          }
-        });
+        return callback(null);
       }
       return async.series([findHigh, findLow], finish);
     };

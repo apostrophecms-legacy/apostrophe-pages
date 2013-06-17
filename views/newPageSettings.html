@@ -8,6 +8,53 @@
       {# JS will populate it #}
       {{ formSelect('type', 'Type', []) }}
       {{ formBoolean('published', 'Published') }}
+
+      {# PERMISSIONS #}
+      {# Toggles open apos-view-permissions #}
+      <div class="apos-page-settings-toggle"><a data-show-view-permissions href="#">Who can see this?</a></div>
+      <div class="apos-view-permissions">
+        <fieldset class="apos-fieldset apos-fieldset-select apos-fieldset-login-required" data-name="{{ loginRequired }}">
+          <label>Permitted</label>
+          {{ formSelectStandalone('loginRequired',
+              [
+                {
+                  value: '',
+                  label: 'Public'
+                },
+                {
+                  value: 'loginRequired',
+                  label: 'Login Required'
+                },
+                {
+                  value: 'certainPeople',
+                  label: 'Certain People'
+                }
+              ]
+            )
+          }}
+          <span class="apos-propagate"><input type="checkbox" name="loginRequiredPropagate" /> Apply to Subpages</span>
+        </fieldset>
+        {# js shows this class when "Certain People" is chosen #}
+        <div class="apos-view-certain-people">
+          {{ formSelective('viewGroupIds', 'Groups', { propagate: true }) }}
+          {{ formSelective('viewPersonIds', 'Individuals', { propagate: true }) }}
+        </div>
+        <p class="apos-view-permissions-hint">Admins can always see everything.</p>
+      </div>
+
+      {# This outer div is for hiding the entirety of edit permissions via JS. -Tom #}
+      <div data-edit-permissions-container>
+        {# Toggles open apos-edit-permissions #}
+        <div class="apos-page-settings-toggle"><a data-show-edit-permissions href="#">Who can edit this?</a></div>
+        <div class="apos-edit-permissions">
+          {{ formSelective('editGroupIds', 'Groups', { propagate: true }) }}
+          {{ formSelective('editPersonIds', 'Individuals', { propagate: true }) }}
+          {# This won't be true for some site somewhere, give it a class #}
+          <p class="apos-edit-permissions-hint">Admins can always edit everything.</p>
+        </div>
+      </div>
+      {# END PERMISSIONS #}
+
       {# We don't allow the slug to be edited for a brand new post, #}
       {# but provide a block the edit template can override #}
       {% block slug %}
