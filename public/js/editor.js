@@ -139,6 +139,14 @@ $.extend(true, window, {
         });
 
         function populateType() {
+          if (!_.find(apos.data.aposPages.types, function(type) {
+            return apos.data.aposPages.page.type === type.name;
+          })) {
+            // Don't let anyone mess with the type of an existing page whose type is not
+            // on the menu, such as the search page
+            $el.find('[data-name="type"]').remove();
+            return;
+          }
           var $type = $el.find('[name=type]');
           $type.html('');
           _.each(apos.data.aposPages.menu || apos.data.aposPages.types, function(type) {
@@ -162,6 +170,11 @@ $.extend(true, window, {
         }
 
         function refreshType() {
+          var $type = $el.find('[name=type]');
+          if (!$type.length) {
+            // Type changes not allowed for this page
+            return;
+          }
           var typeName = $el.find('[name=type]').val();
           if (oldTypeName) {
             var oldType = aposPages.getType(oldTypeName);
@@ -211,8 +224,10 @@ $.extend(true, window, {
           data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get');
 
           _.extend(data, { parent: options.parent, originalSlug: options.slug });
-          if (type.settings && type.settings.serialize) {
-            data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
+          if (type) {
+            if (type.settings && type.settings.serialize) {
+              data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
+            }
           }
           $.ajax(
             {

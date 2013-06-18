@@ -989,12 +989,16 @@ function pages(options, callback) {
   // For visibility in other scopes
   self.options = options;
 
-  function determineType(req) {
+  function determineType(req, def) {
+    if (def === undefined) {
+      def = 'default';
+    }
     var typeName = req.body.type;
     type = self.getType(typeName);
     if (!type) {
-      typeName = 'default';
-      type = self.getType(typeName);
+      typeName = def;
+      // Really basic fallback for things like the search page
+      type = self.getType(typeName) || { name: typeName, label: typeName };
     }
     return type;
   }
@@ -1156,8 +1160,6 @@ function pages(options, callback) {
       published = apos.sanitizeBoolean(req.body.published, true);
       tags = apos.sanitizeTags(req.body.tags);
 
-      type = determineType(req);
-
       originalSlug = req.body.originalSlug;
       slug = req.body.slug;
 
@@ -1201,6 +1203,7 @@ function pages(options, callback) {
         page.published = published;
         page.slug = slug;
         page.tags = tags;
+        type = determineType(req, page.type);
         page.type = type.name;
 
         if ((slug !== originalSlug) && (originalSlug === '/')) {
