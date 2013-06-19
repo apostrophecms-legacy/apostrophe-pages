@@ -1642,6 +1642,7 @@ function pages(options, callback) {
             taken[page.slug] = true;
           }
         });
+        req.extras.search = results;
         return callback(null);
       }
       return async.series([findHigh, findLow], finish);
