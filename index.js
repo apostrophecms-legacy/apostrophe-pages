@@ -1038,6 +1038,8 @@ function pages(options, callback) {
     self.pushAsset('script', 'jqtree', { when: 'user' });
     self.pushAsset('stylesheet', 'jqtree', { when: 'user' });
     self.pushAsset('script', 'editor', { when: 'user' });
+    // Browser side javascript for search is not just for logged in people
+    self.pushAsset('script', 'content', { when: 'always' });
     self.pushAsset('stylesheet', 'editor', { when: 'user' });
     self.pushAsset('template', 'newPageSettings', { when: 'user' });
     self.pushAsset('template', 'editPageSettings', { when: 'user' });
