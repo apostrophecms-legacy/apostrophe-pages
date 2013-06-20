@@ -406,9 +406,11 @@ function pages(options, callback) {
           calls = calls + apos.getGlobalCallsWhen('user');
         }
         calls = calls + apos.getCalls(req);
-        // Always the last call; signifies we're done initializing the main content area
-        // as far as the core is concerned; a lovely time for other modules and project-level
-        // javascript to do their own enhancements
+        // Always the last call; signifies we're done initializing the
+        // page as far as the core is concerned; a lovely time for other
+        // modules and project-level javascript to do their own
+        // enhancements. The content area refresh mechanism also
+        // triggers this event
         calls += '\n$("body").trigger("aposReady");\n';
 
         var args = {
