@@ -124,7 +124,6 @@ function pages(options, callback) {
     });
 
     return function(req, res) {
-
       req.extras = {};
       return async.series([page, permissions, relatives, load, notfound], main);
 
