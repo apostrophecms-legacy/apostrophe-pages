@@ -354,6 +354,7 @@ function pages(options, callback) {
           providePage = false;
         } else if (!req.template) {
           if (err) {
+            console.log(err);
             req.template = 'serverError';
             res.statusCode = 500;
             providePage = false;
