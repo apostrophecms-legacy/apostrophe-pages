@@ -1365,7 +1365,7 @@ function pages(options, callback) {
           if (err || (!results.pages.length)) {
             return callback('Page not found');
           }
-          page = pageArg;
+          page = results.pages[0];
           return callback(null);
         });
       }
