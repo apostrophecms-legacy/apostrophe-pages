@@ -531,7 +531,11 @@ function pages(options, callback) {
   };
 
   // You can skip the options parameter. We need req to
-  // determine permissions
+  // determine permissions. Normally areas associated with
+  // ancestors are not returned. If you specify options.areas as
+  // `true`, all areas will be returned. If you specify options.areas
+  // as an array of area names, areas in that list will be returned.
+
   self.getAncestors = function(req, page, options, callback) {
     if (!callback) {
       callback = options;
@@ -557,10 +561,26 @@ function pages(options, callback) {
         paths.push(path);
         path += '/';
       });
+
+      var getOptions = {
+        fields: {
+          lowSearchText: 0, highSearchText: 0, searchSummary: 0
+        },
+        sort: {
+          path: 1
+        }
+      };
+
+      if (options.areas) {
+        getOptions.areas = options.areas;
+      } else {
+        getOptions.fields.areas = 0;
+      }
+
       // Get metadata about the related pages, skipping expensive stuff.
       // Sorting by path works because longer strings sort
       // later than shorter prefixes
-      return apos.get(req, { path: { $in: paths } }, { fields: { areas: 0, lowSearchText: 0, highSearchText: 0, searchSummary: 0 }, sort: { path: 1 } }, function(err, results) {
+      return apos.get(req, { path: { $in: paths } }, getOptions, function(err, results) {
         if (err) {
           return callback(err);
         }
@@ -596,6 +616,11 @@ function pages(options, callback) {
   // The `orphan` option works the same way. `orphan` pages are
   // normally accessible, but are snot shown in subnav, tabs, etc., so
   // this is the only method for which `orphan` defaults to false.
+  //
+  // Normally areas associated with ancestors are not returned.
+  // If you specify `options.areas` as `true`, all areas will be returned.
+  // If you specify `options.areas` as an array of area names, areas on that
+  // list will be returned.
 
   self.getDescendants = function(req, ofPage, optionsArg, callback) {
     if (!callback) {
@@ -623,7 +648,12 @@ function pages(options, callback) {
     };
 
     // Skip expensive things
-    options.fields = { areas: 0, lowSearchText: 0, highSearchText: 0, searchSummary: 0 };
+    options.fields = { lowSearchText: 0, highSearchText: 0, searchSummary: 0 };
+    if (!options.areas) {
+      // Don't fetch areas at all unless we're interested in a specific
+      // subset of them
+      options.fields.areas = 0;
+    }
     options.sort = { level: 1, rank: 1 };
     apos.get(req, criteria, options, function(err, results) {
       if (err) {

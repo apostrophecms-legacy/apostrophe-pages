@@ -1,5 +1,6 @@
 var assert = require('assert');
 var mongo = require('mongodb');
+var _ = require('underscore');
 var apos = require('apostrophe')();
 
 var db;
@@ -82,6 +83,24 @@ describe('apostrophe-pages', function() {
             level: 0,
             rank: 0,
             slug: '/',
+            areas: {
+              body: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Body content</p>'
+                  }
+                ]
+              },
+              sidebar: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Sidebar content</p>'
+                  }
+                ]
+              }
+            },
             published: true
           },
           // Kids in scrambled order so sort() has work to do
@@ -93,6 +112,24 @@ describe('apostrophe-pages', function() {
             level: 1,
             rank: 2,
             slug: '/contact',
+            areas: {
+              body: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Body content</p>'
+                  }
+                ]
+              },
+              sidebar: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Sidebar content</p>'
+                  }
+                ]
+              }
+            },
             tags: [ 'red', 'green' ],
             published: true
           },
@@ -104,6 +141,24 @@ describe('apostrophe-pages', function() {
             level: 1,
             rank: 0,
             slug: '/about',
+            areas: {
+              body: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Body content</p>'
+                  }
+                ]
+              },
+              sidebar: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Sidebar content</p>'
+                  }
+                ]
+              }
+            },
             tags: [ 'green', 'blue' ],
             published: true
           },
@@ -115,6 +170,24 @@ describe('apostrophe-pages', function() {
             level: 2,
             rank: 1,
             slug: '/about/location',
+            areas: {
+              body: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Body content</p>'
+                  }
+                ]
+              },
+              sidebar: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Sidebar content</p>'
+                  }
+                ]
+              }
+            },
             published: true
           },
           {
@@ -125,6 +198,24 @@ describe('apostrophe-pages', function() {
             level: 2,
             rank: 0,
             slug: '/about/people',
+            areas: {
+              body: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Body content</p>'
+                  }
+                ]
+              },
+              sidebar: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Sidebar content</p>'
+                  }
+                ]
+              }
+            },
             tags: [ 'green' ],
             published: true
           },
@@ -136,6 +227,24 @@ describe('apostrophe-pages', function() {
             level: 1,
             rank: 1,
             slug: '/products',
+            areas: {
+              body: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Body content</p>'
+                  }
+                ]
+              },
+              sidebar: {
+                items: [
+                  {
+                    type: 'richText',
+                    content: '<p>Sidebar content</p>'
+                  }
+                ]
+              }
+            },
             published: true
           }
         ], function(err) {
@@ -178,12 +287,48 @@ describe('apostrophe-pages', function() {
       assert(children[1]._id === 'products');
       assert(children[2]._id === 'contact');
     });
+    it('did not return areas', function() {
+      assert(!children[0].areas);
+      assert(!children[1].areas);
+      assert(!children[2].areas);
+    });
     it('have grandkids', function() {
       assert(children[0].children.length === 2);
     });
     it('grandkids in order', function() {
       assert(children[0].children[0]._id === 'people');
       assert(children[0].children[1]._id === 'location');
+    });
+    it('fetch again with areas turned on', function(done) {
+      pages.getDescendants(req, page, { depth: 2, areas: true }, function(err, childrenArg) {
+        children = childrenArg;
+        assert(!err);
+        assert(children.length === 3);
+        done();
+      });
+    });
+    it('did return all areas', function() {
+      assert(_.keys(children[0].areas).length > 1);
+      assert(_.keys(children[1].areas).length > 1);
+      assert(_.keys(children[2].areas).length > 1);
+    });
+    it('fetch again with specific area', function(done) {
+      pages.getDescendants(req, page, { depth: 2, areas: [ 'body' ] }, function(err, childrenArg) {
+        children = childrenArg;
+        assert(!err);
+        assert(children.length === 3);
+        done();
+      });
+    });
+    it('returned only one area', function() {
+      assert(_.keys(children[0].areas).length === 1);
+      assert(_.keys(children[1].areas).length === 1);
+      assert(_.keys(children[2].areas).length === 1);
+    });
+    it('returned only one area', function() {
+      assert(_.keys(children[0].areas)[0] === 'body');
+      assert(_.keys(children[1].areas)[0] === 'body');
+      assert(_.keys(children[2].areas)[0] === 'body');
     });
   });
 
@@ -205,6 +350,40 @@ describe('apostrophe-pages', function() {
     it('correct paths in order', function() {
       assert(ancestors[0]._id === 'home');
       assert(ancestors[1]._id === 'about');
+    });
+    it('did not return areas', function() {
+      assert(!ancestors[0].areas);
+      assert(!ancestors[1].areas);
+    });
+    it('fetch again with areas turned on', function(done) {
+      var people = children[0].children[0];
+      pages.getAncestors(req, people, { areas: true }, function(err, ancestorsArg) {
+        assert(!err);
+        assert(ancestorsArg);
+        ancestors = ancestorsArg;
+        done();
+      });
+    });
+    it('did return all areas', function() {
+      assert(_.keys(ancestors[0].areas).length > 1);
+      assert(_.keys(ancestors[1].areas).length > 1);
+    });
+    it('fetch again with specific area', function(done) {
+      var people = children[0].children[0];
+      pages.getAncestors(req, people, { areas: [ 'body' ] }, function(err, ancestorsArg) {
+        assert(!err);
+        assert(ancestorsArg);
+        ancestors = ancestorsArg;
+        done();
+      });
+    });
+    it('returned only one area', function() {
+      assert(_.keys(ancestors[0].areas).length === 1);
+      assert(_.keys(ancestors[1].areas).length === 1);
+    });
+    it('returned only one area', function() {
+      assert(_.keys(ancestors[0].areas)[0] === 'body');
+      assert(_.keys(ancestors[1].areas)[0] === 'body');
     });
   });
 
