@@ -21,13 +21,13 @@ Setting up `apostrophe-pages` is easy once you have the main `apos` object. See 
 
 Notice that we set partialPaths to provide global layout templates that can be `extend`ed by our page templates, and set `templatePath` to specify where our page templates area.
 
-## Page Types and Page Type Groups
+## Page Types
 
 The constructor for the pages module accepts a `types` option. In its simplest form, a "page type" is just a template name and a label. If you do not specify a `types` parameter, you get a single type with the name `default` and the label `Default`. this causes `views/default.html` to be loaded to render pages with that type.
 
-However page types can also be extended with custom behavior. See the `apostrophe-blog` module for an example with all the trimmings. The blog also depends on the groups feature, described next.
+However page types can also be extended with custom behavior. See the `apostrophe-blog` module for an example with all the trimmings.
 
-To facilitate code reuse, page types can have a single "superclass" from which they inherit behavior in both the server- and browser-side JavaScript code. Thus you can add essentially the same page type with several labels ("Professional Blog," "Personal Blog") and several names, but set the "group" property to inherit behavior from any group you define with the `pages.addGroup` method or by passing a `groups` option to the constructor.
+To facilitate code reuse, page types can have a single "superclass" from which they inherit behavior in both the server- and browser-side JavaScript code.
 
 Here is a simple example of specifying the `types` option:
 
