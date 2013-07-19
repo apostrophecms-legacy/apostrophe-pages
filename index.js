@@ -517,7 +517,7 @@ function pages(options, callback) {
       // of document.write blowing up a page during a partial update.
       // This is pretty nasty too, keep thinking about alternatives.
       if (!args.safeMode) {
-        args.content = args.content.replace(/<\!\-\- APOS\-RAW\-HTML\-BEFORE \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-START \-\-\>([\s\S]*?)<\!\-\- APOS\-RAW\-HTML\-END \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-AFTER \-\-\>/, function(all, code) {
+        args.content = args.content.replace(/<\!\-\- APOS\-RAW\-HTML\-BEFORE \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-START \-\-\>([\s\S]*?)<\!\-\- APOS\-RAW\-HTML\-END \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-AFTER \-\-\>/g, function(all, code) {
         return ent.decode(code);
         });
       }
