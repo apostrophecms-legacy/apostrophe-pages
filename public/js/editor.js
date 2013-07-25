@@ -320,7 +320,7 @@ $.extend(true, window, {
             $tree = $el.find('[data-tree]');
             $tree.tree({
               data: [],
-              autoOpen: 3,
+              autoOpen: 1,
               dragAndDrop: true,
               onCanMoveTo: function(moved_node, target_node, position) {
                 // Cannot create peers of root

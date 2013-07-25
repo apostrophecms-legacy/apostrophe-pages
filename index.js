@@ -535,6 +535,10 @@ function pages(options, callback) {
   // ancestors are not returned. If you specify options.areas as
   // `true`, all areas will be returned. If you specify options.areas
   // as an array of area names, areas in that list will be returned.
+  //
+  // You may use options.getOptions to pass additional options
+  // directly to apos.get, notably trash: 'any' for use when
+  // implementing reorganize, trashcan, etc.
 
   self.getAncestors = function(req, page, options, callback) {
     if (!callback) {
@@ -577,6 +581,10 @@ function pages(options, callback) {
         getOptions.fields.areas = 0;
       }
 
+      if (options.getOptions) {
+        extend(true, getOptions, options.getOptions);
+      }
+
       // Get metadata about the related pages, skipping expensive stuff.
       // Sorting by path works because longer strings sort
       // later than shorter prefixes
@@ -595,8 +603,12 @@ function pages(options, callback) {
   };
 
   // We need req to determine permissions
-  self.getParent = function(req, page, callback) {
-    return self.getAncestors(req, page, function(err, ancestors) {
+  self.getParent = function(req, page, options, callback) {
+    if (arguments.length === 3) {
+      callback = arguments[2];
+      options = {};
+    }
+    return self.getAncestors(req, page, options, function(err, ancestors) {
       if (err) {
         return callback(err);
       }
@@ -812,7 +824,7 @@ function pages(options, callback) {
       } else {
         return callback('no such position option');
       }
-      self.getParent(req, target, function(err, parentArg) {
+      self.getParent(req, target, { getOptions: { trash: 'any' } }, function(err, parentArg) {
         if (!parentArg) {
           return callback('cannot create peer of home page');
         }
@@ -1667,17 +1679,29 @@ function pages(options, callback) {
         var results = [];
         var taken = {};
         _.each(lowPages, function(page) {
-          results.push(page);
-          taken[page.slug] = true;
+          if (suitable(page)) {
+            results.push(page);
+            taken[page.slug] = true;
+          }
         });
         _.each(highPages, function(page) {
-          if (!taken[page.slug]) {
+          if ((!taken[page.slug]) && suitable(page)) {
             results.push(page);
             taken[page.slug] = true;
           }
         });
         req.extras.search = results;
         return callback(null);
+      }
+      // Vetoes anything belonging to a snippets module that has
+      // specifically declared itself unsearchable
+      function suitable(page) {
+        var s = { page: page, suitable: true };
+        apos.emit('searchable', s);
+        if (!s.suitable) {
+          return false;
+        }
+        return true;
       }
       return async.series([findHigh, findLow], finish);
     };
