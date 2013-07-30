@@ -633,6 +633,9 @@ function pages(options, callback) {
   // If you specify `options.areas` as `true`, all areas will be returned.
   // If you specify `options.areas` as an array of area names, areas on that
   // list will be returned.
+  //
+  // Specifying options.depth = 1 fetches immediate children only.
+  // You may specify any depth. The default depth is 1.
 
   self.getDescendants = function(req, ofPage, optionsArg, callback) {
     if (!callback) {
@@ -819,7 +822,27 @@ function pages(options, callback) {
       }
       if (position === 'before') {
         rank = target.rank;
+        if (rank >= 1000000) {
+          // It's legit to move a page before search or trash, but we
+          // don't want its rank to wind up in the reserved range. Find
+          // the rank of the next page down and increment that.
+          return self.pages.find({ slug: /^\//, path: /^home\/[^\/]$/ }, { rank: 1 }).sort({ rank: -1 }).limit(1).toArray(function(err, pages) {
+            if (err) {
+              return callback(err);
+            }
+            if (!pages.length) {
+              rank = 1;
+              return callback(null);
+            }
+            rank = pages[0].rank;
+            return callback(null);
+          });
+        }
       } else if (position === 'after') {
+        if (target.rank >= 1000000) {
+          // Reserved range
+          return callback('cannot move a page after a system page');
+        }
         rank = target.rank + 1;
       } else {
         return callback('no such position option');
@@ -842,14 +865,16 @@ function pages(options, callback) {
     }
     function nudgeOldPeers(callback) {
       // Nudge up the pages that used to follow us
+      // Leave reserved range alone
       var oldParentPath = path.dirname(moved.path);
-      apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: moved.rank }}, { $inc: { rank: -1 } }, function(err, count) {
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: moved.rank, $lte: 1000000 }}, { $inc: { rank: -1 } }, function(err, count) {
         return callback(err);
       });
     }
     function nudgeNewPeers(callback) {
       // Nudge down the pages that should now follow us
-      apos.pages.update({ path: new RegExp('^' + RegExp.quote(parent.path + '/')), level: parent.level + 1, rank: { $gte: rank }}, { $inc: { rank: 1 } }, function(err, count) {
+      // Leave reserved range alone
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(parent.path + '/')), level: parent.level + 1, rank: { $gte: rank, $lte: 1000000 }}, { $inc: { rank: 1 } }, function(err, count) {
         return callback(err);
       });
     }
