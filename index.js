@@ -467,10 +467,13 @@ function pages(options, callback) {
   // apos.data.aposPages.page in the browser. It's very helpful for building
   // page manipulation UI. But we shouldn't redundantly send the areas, as we are already
   // rendering the ones we care about. And we shouldn't send our relatives
-  // as we're already rendering those as navigation if we want them.
+  // as we're already rendering those as navigation if we want them. Also
+  // prune out the search text which can contain characters that are valid
+  // JSON but not valid JS (the existence of this is a nightmare):
+  // https://code.google.com/p/v8/issues/detail?id=1907
 
   self.prunePage = function(page) {
-    return _.omit(page, 'areas', 'tabs', 'ancestors', 'children', 'peers');
+    return _.omit(page, 'areas', 'tabs', 'ancestors', 'children', 'peers', 'lowSearchText', 'highSearchText', 'searchSummary');
   };
 
   // Decorate the contents of args.content as a complete webpage. If args.refreshing is

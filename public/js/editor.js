@@ -82,6 +82,7 @@ $.extend(true, window, {
                 // Simple POST friendly boolean values
                 published = published ? '1' : '0';
               }
+              apos.enableTags($el.find('[data-name="tags"]'), []);
               refreshType();
               // $el.findByName('published').val(apos.data.pages.parent.published)
               // Copy parent permissions
@@ -115,7 +116,7 @@ $.extend(true, window, {
               $el.find('[name=type]').val(apos.data.aposPages.page.type);
               $el.find('[name=title]').val(apos.data.aposPages.page.title);
               $el.find('[name=slug]').val(slug);
-              $el.find('[name=tags]').val(apos.tagsToString(apos.data.aposPages.page.tags));
+              apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
 
               refreshType();
 
@@ -211,7 +212,7 @@ $.extend(true, window, {
             slug: $el.find('[name=slug]').val(),
             type: $el.find('[name=type]').val(),
             published: $el.find('[name=published]').val(),
-            tags: apos.tagsToArray($el.find('[name="tags"]').val())
+            tags: $el.find('[data-name="tags"]').selective('get')
           };
 
           // Permissions are fancy! But the server does most of the hard work
