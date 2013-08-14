@@ -1689,10 +1689,23 @@ function pages(options, callback) {
 
       function find(callback) {
         return async.mapSeries(queries, function(query, callback) {
-          apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }, limit: 100, sort: { createdAt: -1 } }, function(err, results) {
+          apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1 }, limit: 100 }, function(err, results) {
             if (err) {
               return callback(err);
             }
+            // Most recent first. The best definition of most recent is
+            // somewhat type dependent.
+            results.pages.sort(function(a, b) {
+              var d1 = a.startDate || a.publishedAt || a.createdAt;
+              var d2 = b.startDate || b.publishedAt || b.createdAt;
+              if (d1 > d2) {
+                return -1;
+              } else if (d1 === d2) {
+                return 0;
+              } else {
+                return 1;
+              }
+            });
             return callback(null, results.pages);
           });
         }, function(err, resultGroupsArg) {
