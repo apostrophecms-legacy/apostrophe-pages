@@ -1696,8 +1696,14 @@ function pages(options, callback) {
             // Most recent first. The best definition of most recent is
             // somewhat type dependent.
             results.pages.sort(function(a, b) {
-              var d1 = a.startDate || a.publishedAt || a.createdAt;
-              var d2 = b.startDate || b.publishedAt || b.createdAt;
+              var d1 = a.start || a.publishedAt || a.createdAt;
+              var d2 = b.start || b.publishedAt || b.createdAt;
+              if (d1) {
+                d1 = d1.getTime();
+              }
+              if (d2) {
+                d2 = d2.getTime();
+              }
               if (d1 > d2) {
                 return -1;
               } else if (d1 === d2) {
