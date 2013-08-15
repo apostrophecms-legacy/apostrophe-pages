@@ -168,6 +168,7 @@ $.extend(true, window, {
             var $option = $('<option></option>');
             $option.text(type.label);
             $option.attr('value', type.name);
+            // If we've passed in the presetType, let's select that one.
             if (type.name === presetType) {
               $option.attr('selected', true);
             }
