@@ -68,9 +68,15 @@ $.extend(true, window, {
 
         $('body').on('click', '.apos-new-page', function() {
           var parent = $(this).data('slug');
+          var pageType = $(this).data('pageType');
+
           $el = apos.modalFromTemplate('.apos-new-page-settings', {
             init: function(callback) {
-              populateType();
+
+              // We now can pass an argument to this function that allows a certain page type
+              // (identified in the data attribute "page-type") to be automtically selected.
+              populateType(pageType);
+
               // Copy parent's published status
               //
               // TODO: refactor this frequently used dance of boolean values
@@ -82,8 +88,15 @@ $.extend(true, window, {
                 // Simple POST friendly boolean values
                 published = published ? '1' : '0';
               }
+
               apos.enableTags($el.find('[data-name="tags"]'), []);
               refreshType();
+
+              // Let's go ahead and try to populate the page type setting
+              if (pageType) {
+                type = pageType;
+              }
+
               // $el.findByName('published').val(apos.data.pages.parent.published)
               // Copy parent permissions
               enablePermissions(apos.data.aposPages.page);
@@ -99,6 +112,7 @@ $.extend(true, window, {
 
         $('body').on('click', '.apos-edit-page', function() {
           var slug = $(this).data('slug');
+
           $el = apos.modalFromTemplate('.apos-edit-page-settings', {
             save: save,
             init: function(callback) {
@@ -139,7 +153,7 @@ $.extend(true, window, {
           return false;
         });
 
-        function populateType() {
+        function populateType(presetType) {
           if (!_.find(apos.data.aposPages.types, function(type) {
             return apos.data.aposPages.page.type === type.name;
           })) {
@@ -154,6 +168,9 @@ $.extend(true, window, {
             var $option = $('<option></option>');
             $option.text(type.label);
             $option.attr('value', type.name);
+            if (type.name === presetType) {
+              $option.attr('selected', true);
+            }
             $type.append($option);
           });
           // Some types have custom settings of their own. When appropriate
@@ -176,6 +193,7 @@ $.extend(true, window, {
             // Type changes not allowed for this page
             return;
           }
+
           var typeName = $el.find('[name=type]').val();
           if (oldTypeName) {
             var oldType = aposPages.getType(oldTypeName);
@@ -185,6 +203,7 @@ $.extend(true, window, {
             $el.find('[data-type-details]').html('');
           }
           oldTypeName = typeName;
+
           var type = aposPages.getType(typeName);
 
           if (type.settings) {
