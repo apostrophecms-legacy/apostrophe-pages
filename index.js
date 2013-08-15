@@ -1676,29 +1676,50 @@ function pages(options, callback) {
       req.extras.q = q;
       // Turn it into a regular expression
       q = apos.searchify(q);
-      var highPages;
-      var lowPages;
+      var resultGroups = [];
+      var queries = [
+        { sortTitle: q },
+        { highSearchText: q },
+        { lowSearchText: q }
+      ];
+
       // TODO: add some more variants considered even better matches, such as
       // exact word boundaries rather than embedded words. We can afford it,
       // mongo+node's awfully fast even at this crappy scanning stuff
-      function findHigh(callback) {
-        apos.get(req, { highSearchText: q }, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }, limit: 100 }, function(err, results) {
-          if (err) {
-            return callback(err);
-          }
-          highPages = results.pages;
-          return callback(err);
+
+      function find(callback) {
+        return async.mapSeries(queries, function(query, callback) {
+          apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1 }, limit: 100 }, function(err, results) {
+            if (err) {
+              return callback(err);
+            }
+            // Most recent first. The best definition of most recent is
+            // somewhat type dependent.
+            results.pages.sort(function(a, b) {
+              var d1 = a.start || a.publishedAt || a.createdAt;
+              var d2 = b.start || b.publishedAt || b.createdAt;
+              if (d1) {
+                d1 = d1.getTime();
+              }
+              if (d2) {
+                d2 = d2.getTime();
+              }
+              if (d1 > d2) {
+                return -1;
+              } else if (d1 === d2) {
+                return 0;
+              } else {
+                return 1;
+              }
+            });
+            return callback(null, results.pages);
+          });
+        }, function(err, resultGroupsArg) {
+          resultGroups = resultGroupsArg;
+          return callback(null);
         });
       }
-      function findLow(callback) {
-        apos.get(req, { lowSearchText: q }, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1 }, limit: 100 }, function(err, results) {
-          if (err) {
-            return callback(err);
-          }
-          lowPages = results.pages;
-          return callback(err);
-        });
-      }
+
       function finish(err) {
         if (err) {
           res.statusCode = 500;
@@ -1706,21 +1727,18 @@ function pages(options, callback) {
         }
         var results = [];
         var taken = {};
-        _.each(lowPages, function(page) {
-          if (suitable(page)) {
-            results.push(page);
-            taken[page.slug] = true;
-          }
-        });
-        _.each(highPages, function(page) {
-          if ((!taken[page.slug]) && suitable(page)) {
-            results.push(page);
-            taken[page.slug] = true;
-          }
+        _.each(resultGroups, function(resultGroup) {
+          _.each(resultGroup, function(page) {
+            if ((!taken[page.slug]) && suitable(page)) {
+              results.push(page);
+              taken[page.slug] = true;
+            }
+          });
         });
         req.extras.search = results;
         return callback(null);
       }
+
       // Vetoes anything belonging to a snippets module that has
       // specifically declared itself unsearchable
       function suitable(page) {
@@ -1731,7 +1749,7 @@ function pages(options, callback) {
         }
         return true;
       }
-      return async.series([findHigh, findLow], finish);
+      return async.series([find], finish);
     };
 
     // Given a slug that was returned as a search result, generate a redirect
