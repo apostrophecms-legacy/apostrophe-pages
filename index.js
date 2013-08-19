@@ -151,7 +151,8 @@ function pages(options, callback) {
 
           // Set to the empty string on exact matches, otherwise
           // to the portion of the URL after the slug of req.bestPage. Note
-          // that any trailing / has already been removed
+          // that any trailing / has already been removed. A leading
+          // / is always present, even if the page is the home page.
           req.remainder = remainder;
 
           if (req.bestPage) {
@@ -220,6 +221,30 @@ function pages(options, callback) {
             }
           },
           function(callback) {
+            if (options.peers || true) {
+              var ancestors = req.bestPage.ancestors;
+              if (!ancestors.length) {
+                // The only peer of the homepage is itself.
+                //
+                // Avoid a circular reference that crashes
+                // extend() later when we try to pass the homepage
+                // as the .permalink option to a loader. This
+                // happens if the homepage is a blog.
+                var selfAsPeer = {};
+                extend(true, selfAsPeer, req.bestPage);
+                req.bestPage.peers = [ selfAsPeer ];
+                return callback(null);
+              }
+              var parent = ancestors[ancestors.length - 1];
+              self.getDescendants(req, parent, options.tabOptions || {}, function(err, pages) {
+                req.bestPage.peers = pages;
+                return callback(err);
+              });
+            } else {
+              return callback(null);
+            }
+          },
+          function(callback) {
             if (options.descendants || true) {
               return self.getDescendants(req, req.bestPage, options.descendantOptions || {}, function(err, children) {
                 req.bestPage.children = children;
@@ -233,22 +258,6 @@ function pages(options, callback) {
             if (options.tabs || true) {
               self.getDescendants(req, req.bestPage.ancestors[0] ? req.bestPage.ancestors[0] : req.bestPage, options.tabOptions || {}, function(err, pages) {
                 req.bestPage.tabs = pages;
-                return callback(err);
-              });
-            } else {
-              return callback(null);
-            }
-          },
-          function(callback) {
-            if (options.peers || true) {
-              var ancestors = req.bestPage.ancestors;
-              if (!ancestors.length) {
-                req.bestPage.peers = [ req.bestPage ];
-                return callback(null);
-              }
-              var parent = ancestors[ancestors.length - 1];
-              self.getDescendants(req, parent, options.tabOptions || {}, function(err, pages) {
-                req.bestPage.peers = pages;
                 return callback(err);
               });
             } else {
