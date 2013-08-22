@@ -346,11 +346,14 @@ function pages(options, callback) {
         // whether it is on the allowed list for manual type choices
         // or not. Otherwise implement standard behaviors
 
-        // It's a bit of a hack that we allow loaders to trigger
-        // redirects by stashing a URL in the request object, most would
-        // call that a part of the response. However our pattern so far
-        // has been that the response object is nobody's business but
-        // pages.serve itself so I'm sticking with it for this special case
+        // pages.serve treats the request object as a repository of everything
+        // we know about this request so far, including simple hints about the
+        // desired response. This is different from the default paradigm
+        // of Express.
+
+        if (req.contentType) {
+          res.setHeader('Content-Type', req.contentType);
+        }
 
         if (req.redirect) {
           return res.redirect(req.redirect);
