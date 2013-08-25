@@ -208,7 +208,7 @@ function pages(options, callback) {
             // If you want tabs you also get ancestors, so that
             // the home page is available (the parent of tabs).
             if (options.ancestors || options.tabs || true) {
-              return self.getAncestors(req, req.bestPage, options.ancestorOptions || {}, function(err, ancestors) {
+              return self.getAncestors(req, req.bestPage, options.ancestorCriteria || {}, options.ancestorOptions || {}, function(err, ancestors) {
                 req.bestPage.ancestors = ancestors;
                 if (ancestors.length) {
                   // Also set parent as a convenience
@@ -246,7 +246,7 @@ function pages(options, callback) {
           },
           function(callback) {
             if (options.descendants || true) {
-              return self.getDescendants(req, req.bestPage, options.descendantOptions || {}, function(err, children) {
+              return self.getDescendants(req, req.bestPage, options.descendantCriteria || {}, options.descendantOptions || {}, function(err, children) {
                 req.bestPage.children = children;
                 return callback(err);
               });
@@ -256,7 +256,7 @@ function pages(options, callback) {
           },
           function(callback) {
             if (options.tabs || true) {
-              self.getDescendants(req, req.bestPage.ancestors[0] ? req.bestPage.ancestors[0] : req.bestPage, options.tabOptions || {}, function(err, pages) {
+              self.getDescendants(req, req.bestPage.ancestors[0] ? req.bestPage.ancestors[0] : req.bestPage, options.tabCriteria || {}, options.tabOptions || {}, function(err, pages) {
                 req.bestPage.tabs = pages;
                 return callback(err);
               });
@@ -545,7 +545,7 @@ function pages(options, callback) {
     }
   };
 
-  // You can skip the options parameter. We need req to
+  // Fetch ancestors of the specified page. We need req to
   // determine permissions. Normally areas associated with
   // ancestors are not returned. If you specify options.areas as
   // `true`, all areas will be returned. If you specify options.areas
@@ -554,67 +554,85 @@ function pages(options, callback) {
   // You may use options.getOptions to pass additional options
   // directly to apos.get, notably trash: 'any' for use when
   // implementing reorganize, trashcan, etc.
+  //
+  // You may use the criteria parameter to directly specify additional
+  // MongoDB criteria ancestors must match to be returned.
+  //
+  // You may skip the criteria and options arguments.
 
-  self.getAncestors = function(req, page, options, callback) {
-    if (!callback) {
-      callback = options;
-      options = {};
+  self.getAncestors = function(req, page, criteriaArg, options, callback) {
+    if (arguments.length === 4) {
+      criteriaArg = {};
+      options = arguments[2];
+      callback = arguments[3];
     }
-    if(!options) {
+    if (arguments.length === 3) {
+      criteriaArg = {};
       options = {};
+      callback = arguments[2];
     }
+
     _.defaults(options, {
       root: ''
     });
 
     var paths = [];
-    if (page.path) {
-      var components = page.path.split('/');
-      var path = '';
-      _.each(components, function(component) {
-        path += component;
-        // Don't redundantly load ourselves
-        if (path === page.path) {
-          return;
-        }
-        paths.push(path);
-        path += '/';
-      });
-
-      var getOptions = {
-        fields: {
-          lowSearchText: 0, highSearchText: 0, searchSummary: 0
-        },
-        sort: {
-          path: 1
-        }
-      };
-
-      if (options.areas) {
-        getOptions.areas = options.areas;
-      } else {
-        getOptions.fields.areas = 0;
-      }
-
-      if (options.getOptions) {
-        extend(true, getOptions, options.getOptions);
-      }
-
-      // Get metadata about the related pages, skipping expensive stuff.
-      // Sorting by path works because longer strings sort
-      // later than shorter prefixes
-      return apos.get(req, { path: { $in: paths } }, getOptions, function(err, results) {
-        if (err) {
-          return callback(err);
-        }
-        var pages = results.pages;
-        _.each(pages, function(page) {
-          page.url = options.root + page.slug;
-        });
-        return callback(null, pages);
-      });
+    // Pages that are not part of the tree and the home page of the tree
+    // have no ancestors
+    if ((!page.path) || (page.path.indexOf('/') === -1)) {
+      return callback(null, paths);
     }
-    return callback(null);
+
+    var components = page.path.split('/');
+    var path = '';
+    _.each(components, function(component) {
+      path += component;
+      // Don't redundantly load ourselves
+      if (path === page.path) {
+        return;
+      }
+      paths.push(path);
+      path += '/';
+    });
+
+    var getOptions = {
+      fields: {
+        lowSearchText: 0, highSearchText: 0, searchSummary: 0
+      },
+      sort: {
+        path: 1
+      }
+    };
+
+    if (options.areas) {
+      getOptions.areas = options.areas;
+    } else {
+      getOptions.fields.areas = 0;
+    }
+
+    if (options.getOptions) {
+      extend(true, getOptions, options.getOptions);
+    }
+
+    var criteria = {
+      $and: [
+        { path: { $in: paths } },
+        criteriaArg
+      ]
+    };
+    // Get metadata about the related pages, skipping expensive stuff.
+    // Sorting by path works because longer strings sort
+    // later than shorter prefixes
+    return apos.get(req, criteria, getOptions, function(err, results) {
+      if (err) {
+        return callback(err);
+      }
+      var pages = results.pages;
+      _.each(pages, function(page) {
+        page.url = options.root + page.slug;
+      });
+      return callback(null, pages);
+    });
   };
 
   // We need req to determine permissions
@@ -634,8 +652,6 @@ function pages(options, callback) {
     });
   };
 
-  // You may skip the options parameter and pass just page and callback.
-  //
   // The `trash` option controls whether pages with the trash flag are
   // included. If true, only trash is returned. If false, only non-trash
   // is returned. If null, both are returned. false is the default.
@@ -651,11 +667,21 @@ function pages(options, callback) {
   //
   // Specifying options.depth = 1 fetches immediate children only.
   // You may specify any depth. The default depth is 1.
+  //
+  // You may also pass arbitrary mongodb criteria as the criteria parameter.
+  //
+  // You may skip the criteria argument, or both criteria and options.
 
-  self.getDescendants = function(req, ofPage, optionsArg, callback) {
-    if (!callback) {
-      callback = optionsArg;
+  self.getDescendants = function(req, ofPage, criteriaArg, optionsArg, callback) {
+    if (arguments.length === 4) {
+      callback = arguments[3];
+      optionsArg = arguments[2];
+      criteriaArg = {};
+    }
+    if (arguments.length === 3) {
+      callback = arguments[2];
       optionsArg = {};
+      criteriaArg = {};
     }
     var options = {};
     extend(true, options, optionsArg);
@@ -673,8 +699,12 @@ function pages(options, callback) {
     }
 
     var criteria = {
-      path: new RegExp('^' + RegExp.quote(ofPage.path + '/')),
-      level: { $gt: ofPage.level, $lte: ofPage.level + depth }
+      $and: [
+        {
+          path: new RegExp('^' + RegExp.quote(ofPage.path + '/')),
+          level: { $gt: ofPage.level, $lte: ofPage.level + depth }
+        }, criteriaArg
+      ]
     };
 
     // Skip expensive things
