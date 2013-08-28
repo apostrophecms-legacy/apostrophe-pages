@@ -571,7 +571,6 @@ function pages(options, callback) {
       criteriaArg = {};
       options = {};
     }
-
     _.defaults(options, {
       root: ''
     });
@@ -854,7 +853,7 @@ function pages(options, callback) {
       });
     }
     function getOldParent(callback) {
-      self.getParent(req, moved, function(err, parentArg) {
+      self.getParent(req, moved, { getOptions: { permissions: false, trash: 'any' } }, function(err, parentArg) {
         oldParent = parentArg;
         return callback(err);
       });
@@ -892,7 +891,7 @@ function pages(options, callback) {
       } else {
         return callback('no such position option');
       }
-      self.getParent(req, target, { getOptions: { trash: 'any' } }, function(err, parentArg) {
+      self.getParent(req, target, { getOptions: { permissions: false, trash: 'any' } }, function(err, parentArg) {
         if (!parentArg) {
           return callback('cannot create peer of home page');
         }
