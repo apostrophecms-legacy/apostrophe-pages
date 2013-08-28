@@ -562,14 +562,14 @@ function pages(options, callback) {
 
   self.getAncestors = function(req, page, criteriaArg, options, callback) {
     if (arguments.length === 4) {
-      criteriaArg = {};
-      options = arguments[2];
       callback = arguments[3];
+      options = arguments[2];
+      criteriaArg = {};
     }
     if (arguments.length === 3) {
+      callback = arguments[2];
       criteriaArg = {};
       options = {};
-      callback = arguments[2];
     }
 
     _.defaults(options, {
