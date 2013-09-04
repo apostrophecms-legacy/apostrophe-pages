@@ -1040,31 +1040,35 @@ function pages(options, callback) {
     });
   };
 
+  // Add a page type.
+  //
   // The simplest type you can pass in is an object with name and label properties.
   // That enables a custom page template in your views folder. You can do a lot more
   // than that, though; see apostrophe-snippets for the basis from which blogs and
   // events are both built.
+  //
+  // To simplify the creation of the page types menu, you may push a type more than
+  // once under the same name: usually the first time with just the name and label,
+  // and the second time with a complete page type manager object, as when initializing
+  // the blog module. The last version added wins.
 
   self.addType = function(type) {
+    var found = false;
+    var i;
+    for (i = 0; (i < self.types.length); i++) {
+      if (self.types[i].name === type.name) {
+        self.types[i] = type;
+        return;
+      }
+    }
     self.types.push(type);
     apos.pushGlobalCallWhen('user', 'aposPages.addType(?)', { name: type.name, label: type.label });
   };
 
-  // Call this last, AFTER adding all the page types, and only if you do not want
-  // some of them to actually be on the page types menu, or wish to change
-  // the order or labeling. This does not create new types, it only amends
-  // the choices displayed to the user. It's common to use this if you are
-  // registering the snippets module but only want them for widgets, not a page type.
-  //
-  // Example:
-  //
-  // pages.setMenu([
-  //   { name: 'default', label: 'Default (Two Column)' },
-  //   { name: 'home', label: 'Home Page' },
-  //   { name: 'blog', label: 'Blog' },
-  //   { name: 'events', label: 'Events' },
-  //   { name: 'map', label: 'Map' }
-  // ]);
+  // May be called to re-order page types. Called automatically once at the end
+  // of initialization, which is usually sufficient now that the `types` option
+  // is permitted to contain types that will later be reinitialized by other
+  // modules, e.g. blog
 
   self.setMenu = function(choices) {
     apos.pushGlobalData({
@@ -1098,6 +1102,8 @@ function pages(options, callback) {
   _.each(options.types, function(type) {
     self.addType(type);
   });
+
+  self.setMenu(options.types);
 
   // For visibility in other scopes
   self.options = options;
