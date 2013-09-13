@@ -1,6 +1,6 @@
 {
   "name": "apostrophe-pages",
-  "version": "0.1.40",
+  "version": "0.1.41",
   "description": "Adds trees of pages to the Apostrophe content management system",
   "main": "index.js",
   "scripts": {
