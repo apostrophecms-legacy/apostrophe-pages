@@ -62,7 +62,7 @@ $.extend(true, window, {
       // Shared state closure for the page settings dialogs (new and edit)
       (function() {
         var oldTypeName;
-        var typeData = {};
+        var otherTypeSettings = {};
         // Active dialog
         var $el;
 
@@ -117,6 +117,7 @@ $.extend(true, window, {
             save: save,
             init: function(callback) {
               populateType();
+
               // TODO: refactor this frequently used dance of boolean values
               // into editor.js or content.js
               var published = apos.data.aposPages.page.published;
@@ -131,6 +132,14 @@ $.extend(true, window, {
               $el.find('[name=title]').val(apos.data.aposPages.page.title);
               $el.find('[name=slug]').val(slug);
               apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
+
+              // Persistence for settings made when the page had a different type.
+              // Makes Apostrophe forgiving of otherwise serious mistakes, like
+              // adding 20 hand-curated choices in custom page settings for a type,
+              // switching to another type, saving, and then changing your mind
+              if (apos.data.aposPages.page.otherTypeSettings) {
+                otherTypeSettings = apos.data.aposPages.page.otherTypeSettings;
+              }
 
               refreshType();
 
@@ -199,7 +208,7 @@ $.extend(true, window, {
           if (oldTypeName) {
             var oldType = aposPages.getType(oldTypeName);
             if (oldType.settings) {
-              typeData[oldTypeName] = oldType.settings.serialize($el, $el.find('[data-type-details]'));
+              otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $el.find('[data-type-details]'));
             }
             $el.find('[data-type-details]').html('');
           }
@@ -210,7 +219,7 @@ $.extend(true, window, {
           if (type.settings) {
             var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._typeCss);
             $el.find('[data-type-details]').html($typeEl);
-            var typeDefaults = typeData[typeName];
+            var typeDefaults = otherTypeSettings[typeName];
             if (!typeDefaults) {
               if (apos.data.aposPages.page.type === type.name) {
                 typeDefaults = apos.data.aposPages.page.typeSettings;
@@ -232,7 +241,8 @@ $.extend(true, window, {
             slug: $el.find('[name=slug]').val(),
             type: $el.find('[name=type]').val(),
             published: $el.find('[name=published]').val(),
-            tags: $el.find('[data-name="tags"]').selective('get')
+            tags: $el.find('[data-name="tags"]').selective('get'),
+            otherTypeSettings: otherTypeSettings
           };
 
           // Permissions are fancy! But the server does most of the hard work

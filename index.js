@@ -1238,19 +1238,23 @@ function pages(options, callback) {
           page.loginRequired = parent.loginRequired;
         }
 
-        self.applyPermissions(req, page, function(err) {
-          if (err) {
-            return callback(err);
+        return async.series({
+          applyPermissions: function(callback) {
+            return self.applyPermissions(req, page, callback);
+          },
+          sanitizeTypeSettings: function(callback) {
+            return addSanitizedTypeData(req, page, type, callback);
+          },
+          // To be nice we keep the type settings around for other page types the user
+          // thought about giving this page. This avoids pain if the user switches and
+          // switches back. Alas it means we must keep validating them on save
+          sanitizeOtherTypeSettings: function(callback) {
+            return self.sanitizeOtherTypeSettings(req, page, callback);
+          },
+          putPage: function(callback) {
+            return apos.putPage(req, page.slug, page, callback);
           }
-
-          addSanitizedTypeData(req, page, type, putPage);
-          function putPage(err) {
-            if (err) {
-              return callback(err);
-            }
-            apos.putPage(req, page.slug, page, callback);
-          }
-        });
+        }, callback);
       }
 
       function sendPage(err) {
@@ -1331,21 +1335,23 @@ function pages(options, callback) {
           return callback('Cannot change the slug of the home page');
         }
 
-        addSanitizedTypeData(req, page, type, putPage);
-
-        function putPage(err) {
-          if (err) {
-            console.log('putPage: ');
-            console.log(err);
-            return callback(err);
-          }
-          self.applyPermissions(req, page, function(err) {
-            if (err) {
-              return callback(err);
-            }
+        return async.series({
+          applyPermissions: function(callback) {
+            return self.applyPermissions(req, page, callback);
+          },
+          sanitizeTypeSettings: function(callback) {
+            return addSanitizedTypeData(req, page, type, callback);
+          },
+          // To be nice we keep the type settings around for other page types this page
+          // has formerly had. This avoids pain if the user switches and switches back.
+          // Alas it means we must keep validating them on save
+          sanitizeOtherTypeSettings: function(callback) {
+            return self.sanitizeOtherTypeSettings(req, page, callback);
+          },
+          putPage: function(callback) {
             return apos.putPage(req, originalSlug, page, callback);
-          });
-        }
+          }
+        }, callback);
       }
 
       function redirect(callback) {
@@ -1367,6 +1373,31 @@ function pages(options, callback) {
         return res.send(JSON.stringify(page));
       }
     });
+
+    self.sanitizeOtherTypeSettings = function(req, page, callback) {
+      var raw = req.body.otherTypeSettings || {};
+      var sanitized = {};
+      return async.eachSeries(aposPages.types, function(type, callback) {
+        if (raw[type.name] && type.settings.sanitize) {
+          return type.settings.sanitize(raw[type.name] || {}, function(err, data) {
+            if (err) {
+              // Bad page settings for types not currently in effect are not a crisis
+              return callback(null);
+            }
+            sanitized[type.name] = data;
+            return callback(null);
+          });
+        } else {
+          return callback(null);
+        }
+      }, function(err) {
+        if (err) {
+          return callback(err);
+        }
+        page.otherTypeSettings = sanitized;
+        return callback(null);
+      });
+    };
 
     self.applyPermissions = function(req, page, callback) {
       var fields = [ 'viewGroupIds', 'viewPersonIds' ];
