@@ -799,9 +799,13 @@ function pages(options, callback) {
 
   // position can be 'before', 'after' or 'inside' and determines the
   // moved page's new relationship to the target page. You may pass
-  // page objects instead of slugs if you have them
+  // page objects instead of slugs if you have them. The callback
+  // receives an error and, if there is no error, also an array of
+  // objects with _id and slug properties, indicating the new slugs
+  // of all modified pages
+
   self.move = function(req, movedSlug, targetSlug, position, callback) {
-    var moved, target, parent, oldParent;
+    var moved, target, parent, oldParent, changed = [];
     if (typeof(movedSlug) === 'object') {
       moved = movedSlug;
     }
@@ -939,6 +943,10 @@ function pages(options, callback) {
             slugStem += '/';
           }
           moved.slug = moved.slug.replace(matchOldParentSlugPrefix, addSlashIfNeeded(parent.slug));
+          changed.push({
+            _id: moved._id,
+            slug: moved.slug
+          });
         }
       }
       moved.level = level;
@@ -955,7 +963,13 @@ function pages(options, callback) {
       });
     }
     function moveDescendants(callback) {
-      return self.updateDescendantPathsAndSlugs(moved, originalPath, originalSlug, callback);
+      return self.updateDescendantPathsAndSlugs(moved, originalPath, originalSlug, function(err, changedArg) {
+        if (err) {
+          return callback(err);
+        }
+        changed = changed.concat(changedArg);
+        return callback(null);
+      });
     }
     function trashDescendants(callback) {
       // Make sure our descendants have the same trash status
@@ -970,10 +984,23 @@ function pages(options, callback) {
       apos.pages.update({ path: matchParentPathPrefix }, { $set: $set, $unset: $unset }, callback);
     }
     function finish(err) {
-      return callback(err);
+      if (err) {
+        return callback(err);
+      }
+      return callback(null, changed);
     }
   };
 
+  /**
+   * Update the paths and slugs of descendant pages, changing slugs only if they were
+   * compatible with the original slug. On success, invokes callback with
+   * null and an array of objects with _id and slug properties, indicating
+   * the new slugs for any objects that were modified.
+   * @param  {page}   page
+   * @param  {string}   originalPath
+   * @param  {string}   originalSlug
+   * @param  {Function} callback
+   */
   self.updateDescendantPathsAndSlugs = function(page, originalPath, originalSlug, callback) {
     // If our slug changed, then our descendants' slugs should
     // also change, if they are still similar. You can't do a
@@ -983,7 +1010,7 @@ function pages(options, callback) {
     // there may be zillions of descendants and we don't want
     // to choke the server. We could use async.mapLimit, but
     // let's not get fancy just yet
-
+    var changed = [];
     if ((originalSlug === page.slug) && (originalPath === page.path)) {
       return callback(null);
     }
@@ -1002,17 +1029,25 @@ function pages(options, callback) {
           done = true;
           return callback(null);
         }
+        var newSlug = desc.slug.replace(matchParentSlugPrefix, page.slug + '/');
+        changed.push({
+          _id: desc._id,
+          slug: newSlug
+        });
         apos.pages.update({ _id: desc._id }, { $set: {
-            // Always matches
-            path: desc.path.replace(matchParentPathPrefix, page.path + '/'),
-            // Might not match, and we don't care (if they edited the slug that far up,
-            // they did so intentionally)
-            slug: desc.slug.replace(matchParentSlugPrefix, page.slug + '/'),
-            level: desc.level + (page.level - oldLevel)
+          // Always matches
+          path: desc.path.replace(matchParentPathPrefix, page.path + '/'),
+          // Might not match, and we don't care (if they edited the slug that far up,
+          // they did so intentionally)
+          slug: newSlug,
+          level: desc.level + (page.level - oldLevel)
         }}, callback);
       });
     }, function(err) {
-      return callback(err);
+      if (err) {
+        return callback(err);
+      }
+      return callback(null, changed);
     });
   };
 
@@ -1493,6 +1528,7 @@ function pages(options, callback) {
       var trash;
       var page;
       var parent;
+      var changed = [];
       async.series([findTrash, findPage, findParent, movePage], respond);
 
       function findTrash(callback) {
@@ -1529,7 +1565,13 @@ function pages(options, callback) {
       }
 
       function movePage(callback) {
-        self.move(req, page, trash, 'inside', callback);
+        self.move(req, page, trash, 'inside', function(err, changedArg) {
+          if (err) {
+            return callback(err);
+          }
+          changed = changedArg;
+          return callback(null);
+        });
       }
 
       function respond(err) {
@@ -1538,9 +1580,14 @@ function pages(options, callback) {
             status: err
           }));
         }
+        // jqtree likes .id, not ._id
+        _.each(changed, function(info) {
+          info.id = info._id;
+        });
         return res.send(JSON.stringify({
           status: 'ok',
-          parent: parent.slug
+          parent: parent.slug,
+          changed: changed
         }));
       }
     });
@@ -1567,7 +1614,10 @@ function pages(options, callback) {
           var info = {
             label: page.title,
             slug: page.slug,
+            // Available both ways for compatibility with jqtree and
+            // mongodb expectations
             _id: page._id,
+            id: page._id,
             // For icons
             type: page.type,
             // Also nice for icons and browser-side decisions about what's draggable where
@@ -1575,8 +1625,16 @@ function pages(options, callback) {
           };
           if (page.children && page.children.length) {
             info.children = [];
+            // Sort trash after non-trash
             _.each(page.children, function(child) {
-              info.children.push(pageToJqtree(child));
+              if (!child.trash) {
+                info.children.push(pageToJqtree(child));
+              }
+            });
+            _.each(page.children, function(child) {
+              if (child.trash) {
+                info.children.push(pageToJqtree(child));
+              }
             });
           }
           return info;
@@ -1718,17 +1776,19 @@ function pages(options, callback) {
     // This is done by adjusting the path and level properties of the moved page
     // as well as the rank properties of that page and its new and former peers
     app.post('/apos-pages/move-jqtree', function(req, res) {
-      function fail() {
-      }
       var movedSlug = apos.sanitizeString(req.body.moved);
       var targetSlug = apos.sanitizeString(req.body.target);
       var position = req.body.position;
-      return self.move(req, movedSlug, targetSlug, position, function(err) {
+      return self.move(req, movedSlug, targetSlug, position, function(err, changed) {
         if (err) {
           res.statusCode = 404;
           return res.send();
         } else {
-          return res.send({status: 'ok'});
+          // jqtree likes .id, not ._id
+          _.each(changed, function(info) {
+            info.id = info._id;
+          });
+          return res.send({status: 'ok', changed: changed });
         }
       });
     });

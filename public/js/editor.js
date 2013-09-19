@@ -359,8 +359,83 @@ $.extend(true, window, {
                   return false;
                 }
                 return true;
+              },
+              onCreateLi: function(node, $li) {
+                // Identify the root trashcan and add a class to its li so that we
+                // can hide inappropriate controls within the trash
+                // TODO: do we want to make this slug a constant forever?
+                if (node.slug == '/trash') {
+                  $li.addClass('apos-trash');
+                }
+                // Append a link to the jqtree-element div.
+                // The link has a url '#node-[id]' and a data property 'node-id'.
+                var link = $('<a class="apos-visit"></a>');
+                link.attr('data-node-id', node.id);
+                link.attr('data-visit', '1');
+                link.attr('href', '#');
+                link.text('»');
+                $li.find('.jqtree-element').append(link);
+
+                link = $('<a class="apos-delete"></a>');
+                link.attr('data-node-id', node.id);
+                link.attr('data-delete', '1');
+                link.attr('href', '#');
+                link.text('x');
+                $li.find('.jqtree-element').append(link);
               }
             });
+            $tree.on('click', '[data-visit]', function() {
+              var nodeId = $(this).attr('data-node-id');
+              apos.log(nodeId);
+              var node = $tree.tree('getNodeById', nodeId);
+              apos.log(node);
+              // TODO: this is an assumption about where the root of the page tree
+              // is being served
+              window.location.href = node.slug;
+              return false;
+            });
+
+            $tree.on('click', '[data-delete]', function() {
+              var nodeId = $(this).attr('data-node-id');
+              var node = $tree.tree('getNodeById', nodeId);
+              // Find the trashcan so we can mirror what happened on the server
+              var trash;
+              _.each($tree.tree('getTree').children[0].children, function(node) {
+                if (node.trash) {
+                  trash = node;
+                }
+              });
+              if (!trash) {
+                alert('No trashcan.');
+                return false;
+              }
+              $.ajax({
+                url: '/apos-pages/delete',
+                data: {
+                  slug: node.slug
+                },
+                type: 'POST',
+                dataType: 'json',
+                success: function(data) {
+                  if (data.status === 'ok') {
+                    $tree.tree('moveNode', node, trash, 'inside');
+                    _.each(data.changed, function(info) {
+                      var node = $tree.tree('getNodeById', info.id);
+                      if (node) {
+                        node.slug = info.slug;
+                      }
+                    });
+                  } else {
+                    alert(data.status);
+                  }
+                },
+                error: function() {
+                  alert('Server error');
+                }
+              });
+              return false;
+            });
+
             $tree.on('tree.move', function(e) {
               e.preventDefault();
               var data = {
@@ -373,7 +448,14 @@ $.extend(true, window, {
                 data: data,
                 type: 'POST',
                 dataType: 'json',
-                success: function() {
+                success: function(data) {
+                  // Reflect changed slugs
+                  _.each(data.changed, function(info) {
+                    var node = $tree.tree('getNodeById', info.id);
+                    if (node) {
+                      node.slug = info.slug;
+                    }
+                  });
                   e.move_info.do_move();
                 },
                 error: function() {
