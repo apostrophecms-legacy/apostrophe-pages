@@ -1320,7 +1320,9 @@ function pages(options, callback) {
       published = apos.sanitizeBoolean(req.body.published, true);
       tags = apos.sanitizeTags(req.body.tags);
 
-      originalSlug = req.body.originalSlug;
+      // Allows simple edits of page settings that aren't interested in changing the slug.
+      // If you are allowing slug edits you must supply originalSlug.
+      originalSlug = req.body.originalSlug || req.body.slug;
       slug = req.body.slug;
 
       slug = apos.slugify(slug, { allow: '/' });
