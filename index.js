@@ -124,6 +124,14 @@ function pages(options, callback) {
     });
 
     return function(req, res) {
+
+      // Express doesn't provide the absolute URL the user asked for by default.
+      // TODO: move this to middleware for even more general availability in Apostrophe.
+      // See: https://github.com/visionmedia/express/issues/1377
+      if (!req.absoluteUrl) {
+        req.absoluteUrl = req.protocol + '://' + req.get('Host') + req.url;
+      }
+
       req.extras = {};
       return async.series([page, permissions, relatives, load, notfound], main);
 
@@ -459,14 +467,20 @@ function pages(options, callback) {
           }
           content = apos.partial(path, args);
         } else {
-          // A custom loader gave us a function to render with
-          content = req.template(args);
+          // A custom loader gave us a function to render with.
+          // Give it access to the same arguments, and also to the request
+          // object which is helpful in unusual cases like RSS feed generation
+          content = req.template(args, req);
         }
 
         args.content = content;
         args.safeMode = (req.query.safe_mode !== undefined);
-        // AJAX requests never get an outer layout
-        if (req.xhr) {
+        // AJAX requests never get an outer layout. Also allow
+        // for a query parameter that fakes xhr and a flag to
+        // explicitly shut off decoration, which is useful if
+        // the template is rendering an alternative format
+        // such as RSS
+        if (req.xhr || req.query.xhr || (req.decorate === false)) {
           return res.send(content);
         } else {
           return res.send(self.decoratePageContent(args));
@@ -526,6 +540,10 @@ function pages(options, callback) {
       match = args.content.match(/<\!\-\- APOS\-TITLE ([\s\S]*?) \-\-\>/);
       if (match) {
         args.title = match[1];
+      }
+      match = args.content.match(/<\!\-\- APOS\-EXTRA\-HEAD ([\s\S]*?) \-\-\>/);
+      if (match) {
+        args.extraHead = match[1];
       }
 
       // Allow raw HTML slots on a true page update, without the risk
