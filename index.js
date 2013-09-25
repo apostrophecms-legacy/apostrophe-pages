@@ -1030,7 +1030,7 @@ function pages(options, callback) {
     // let's not get fancy just yet
     var changed = [];
     if ((originalSlug === page.slug) && (originalPath === page.path)) {
-      return callback(null);
+      return callback(null, changed);
     }
     var oldLevel = originalPath.split('/').length - 1;
     var matchParentPathPrefix = new RegExp('^' + RegExp.quote(originalPath + '/'));
