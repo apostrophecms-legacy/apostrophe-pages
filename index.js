@@ -1463,7 +1463,7 @@ function pages(options, callback) {
 
       var userPermissions = req.user && req.user.permissions;
       if (userPermissions.admin) {
-        fields.concat([ 'editGroupIds', 'editPersonIds' ]);
+        fields = fields.concat([ 'editGroupIds', 'editPersonIds' ]);
       }
 
       var propagatePull;
