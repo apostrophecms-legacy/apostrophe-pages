@@ -1847,7 +1847,7 @@ function pages(options, callback) {
 
       function find(callback) {
         return async.mapSeries(queries, function(query, callback) {
-          apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1 }, limit: 100 }, function(err, results) {
+          apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1, startTime: 1, start: 1, endDate: 1, endTime: 1, end: 1 }, limit: 100 }, function(err, results) {
             if (err) {
               return callback(err);
             }
