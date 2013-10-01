@@ -1950,6 +1950,63 @@ function pages(options, callback) {
       // Pass the options as one argument so they can be passed on
       return apos.partial('pagesMenu', { args: options }, __dirname + '/views');
     });
+
+    apos.on('tasks:register', function(taskGroups) {
+      taskGroups.apostrophe.repairTree = function(apos, argv, callback) {
+        var root;
+        var pages;
+        return async.series({
+          getRoot: function(callback) {
+            return apos.pages.findOne({ slug: '/' }, function(err, page) {
+              if (err) {
+                return callback(err);
+              }
+              if (!page) {
+                return callback('No home page found');
+              }
+              root = page;
+              return callback(null);
+            });
+          },
+          getDescendants: function(callback) {
+            return self.getDescendants(apos.getTaskReq(), root, {}, { permissions: false, orphan: null, trash: null, depth: 100 }, function(err, pagesArg) {
+              pages = pagesArg;
+              return callback(err);
+            });
+          },
+          fixChildren: function(callback) {
+            return fixChildren(root, pages, callback);
+          }
+        }, callback);
+        function fixChildren(parent, pages, callback) {
+          var rank = 0;
+          return async.eachSeries(pages, function(page, callback) {
+            if (page.slug === '/trash') {
+              page.rank = 1000001;
+            } else if (page.slug === '/search') {
+              page.rank = 1000000;
+            } else {
+              page.rank = rank++;
+            }
+            return async.series({
+              updateRank: function(callback) {
+                var update = { $set: { rank: page.rank } };
+                if (parent.trash) {
+                  update.$set.trash = true;
+                  page.trash = true;
+                } else {
+                  page.$unset = { trash: true };
+                }
+                return apos.pages.update({ _id: page._id }, update, callback);
+              },
+              updateChildren: function(callback) {
+                return fixChildren(page, page.children || [], callback);
+              }
+            }, callback);
+          }, callback);
+        }
+      };
+    });
   }
 
   async.series([ pathIndex ], callback);
