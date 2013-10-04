@@ -1141,6 +1141,232 @@ function pages(options, callback) {
     options.ui = true;
   }
 
+  // Implementation of the /edit route which manipulates page settings. Broken out to
+  // a method for easier unit testing
+  self._editRoute = function(req, res) {
+
+    var page;
+    var originalSlug;
+    var slug;
+    var title;
+    var published;
+    var tags;
+    var type;
+
+    title = req.body.title.trim();
+    // Validation is annoying, automatic cleanup is awesome
+    if (!title.length) {
+      title = 'Untitled Page';
+    }
+
+    published = apos.sanitizeBoolean(req.body.published, true);
+    tags = apos.sanitizeTags(req.body.tags);
+
+    // Allows simple edits of page settings that aren't interested in changing the slug.
+    // If you are allowing slug edits you must supply originalSlug.
+    originalSlug = req.body.originalSlug || req.body.slug;
+    slug = req.body.slug;
+
+    slug = apos.slugify(slug, { allow: '/' });
+    // Make sure they don't turn it into a virtual page
+    if (!slug.match(/^\//)) {
+      slug = '/' + slug;
+    }
+    // Eliminate double slashes
+    slug = slug.replace(/\/+/g, '/');
+    // Eliminate trailing slashes
+    slug = slug.replace(/\/$/, '');
+    // ... But never eliminate the leading /
+    if (!slug.length) {
+      slug = '/';
+    }
+
+    async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
+
+    function getPage(callback) {
+
+      return apos.getPage(req, originalSlug, function(err, pageArg) {
+        page = pageArg;
+        if ((!err) && (!page)) {
+          err = 'Bad page';
+        }
+        return callback(err);
+      });
+    }
+
+    function permissions(callback) {
+      return apos.permissions(req, 'edit-page', page, function(err) {
+        // If there is no permissions error then we are cool
+        // enough to edit the page
+        return callback(err);
+      });
+    }
+
+    function updatePage(callback) {
+      page.title = title;
+      page.published = published;
+      page.slug = slug;
+      page.tags = tags;
+      type = determineType(req, page.type);
+      page.type = type.name;
+
+      if ((slug !== originalSlug) && (originalSlug === '/')) {
+        return callback('Cannot change the slug of the home page');
+      }
+
+      return async.series({
+        applyPermissions: function(callback) {
+          return self.applyPermissions(req, page, callback);
+        },
+        sanitizeTypeSettings: function(callback) {
+          return addSanitizedTypeData(req, page, type, callback);
+        },
+        // To be nice we keep the type settings around for other page types this page
+        // has formerly had. This avoids pain if the user switches and switches back.
+        // Alas it means we must keep validating them on save
+        sanitizeOtherTypeSettings: function(callback) {
+          return self.sanitizeOtherTypeSettings(req, page, callback);
+        },
+        putPage: function(callback) {
+          return apos.putPage(req, originalSlug, page, callback);
+        }
+      }, callback);
+    }
+
+    function redirect(callback) {
+      apos.updateRedirect(originalSlug, slug, callback);
+    }
+
+    function updateDescendants(callback) {
+      // We don't change the path here
+      self.updateDescendantPathsAndSlugs(page, page.path, originalSlug, callback);
+    }
+
+    function sendPage(err) {
+      if (err) {
+        console.log('the error:');
+        console.log(err);
+        res.statusCode = 500;
+        return res.send(err);
+      }
+      return res.send(JSON.stringify(page));
+    }
+  };
+
+  self.sanitizeOtherTypeSettings = function(req, page, callback) {
+    var raw = req.body.otherTypeSettings || {};
+    var sanitized = {};
+    return async.eachSeries(aposPages.types, function(type, callback) {
+      if (raw[type.name] && type.settings.sanitize) {
+        return type.settings.sanitize(raw[type.name] || {}, function(err, data) {
+          if (err) {
+            // Bad page settings for types not currently in effect are not a crisis
+            return callback(null);
+          }
+          sanitized[type.name] = data;
+          return callback(null);
+        });
+      } else {
+        return callback(null);
+      }
+    }, function(err) {
+      if (err) {
+        return callback(err);
+      }
+      page.otherTypeSettings = sanitized;
+      return callback(null);
+    });
+  };
+
+  self.applyPermissions = function(req, page, callback) {
+    var fields = [ 'viewGroupIds', 'viewPersonIds' ];
+
+    // Only admins can change editing permissions.
+    //
+    // TODO I should be checking this as a named permission in its own right
+
+    var userPermissions = req.user && req.user.permissions;
+    if (userPermissions.admin) {
+      fields = fields.concat([ 'editGroupIds', 'editPersonIds' ]);
+    }
+
+    var propagatePull;
+    var propagateAdd;
+    var propagateSet;
+    var propagateUnset;
+    var loginRequired = apos.sanitizeSelect(req.body.loginRequired, [ '', 'loginRequired', 'certainPeople' ], '');
+    if (loginRequired === '') {
+      delete page.loginRequired;
+    } else {
+      page.loginRequired = loginRequired;
+    }
+    if (apos.sanitizeBoolean(req.body.loginRequiredPropagate)) {
+      if (loginRequired !== '') {
+        propagateSet = { loginRequired: loginRequired };
+      } else {
+        propagateUnset = { loginRequired: 1 };
+      }
+    }
+
+    _.each(fields, function(field) {
+      page[field] = [];
+      _.each(req.body[field], function(datum) {
+        if (typeof(datum) !== 'object') {
+          return;
+        }
+        var removed = apos.sanitizeBoolean(datum.removed);
+        var propagate = apos.sanitizeBoolean(datum.propagate);
+        if (removed) {
+          if (propagate) {
+            if (!propagatePull) {
+              propagatePull = {};
+            }
+            if (!propagatePull[field]) {
+              propagatePull[field] = [];
+            }
+            propagatePull[field].push(datum.value);
+          }
+        } else {
+          if (propagate) {
+            if (!propagateAdd) {
+              propagateAdd = {};
+            }
+            if (!propagateAdd[field]) {
+              propagateAdd[field] = [];
+            }
+            propagateAdd[field].push(datum.value);
+          }
+          page[field].push(datum.value);
+          page.certainPeople = true;
+        }
+      });
+    });
+    if (propagatePull || propagateAdd || propagateSet || propagateUnset) {
+      var command = {};
+      if (propagatePull) {
+        command.$pull = { };
+        _.each(propagatePull, function(values, field) {
+          command.$pull[field] = { $in: values };
+        });
+      }
+      if (propagateAdd) {
+        command.$addToSet = { };
+        _.each(propagateAdd, function(values, field) {
+          command.$addToSet[field] = { $each: values };
+        });
+      }
+      if (propagateSet) {
+        command.$set = propagateSet;
+      }
+      if (propagateUnset) {
+        command.$unset = propagateUnset;
+      }
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, callback);
+    } else {
+      return callback(null);
+    }
+  };
+
   if (options.ui) {
     apos.pushGlobalData({
       aposPages: {
@@ -1319,229 +1545,8 @@ function pages(options, callback) {
       }
     });
 
-    app.post('/apos-pages/edit', function(req, res) {
-
-      var page;
-      var originalSlug;
-      var slug;
-      var title;
-      var published;
-      var tags;
-      var type;
-
-      title = req.body.title.trim();
-      // Validation is annoying, automatic cleanup is awesome
-      if (!title.length) {
-        title = 'Untitled Page';
-      }
-
-      published = apos.sanitizeBoolean(req.body.published, true);
-      tags = apos.sanitizeTags(req.body.tags);
-
-      // Allows simple edits of page settings that aren't interested in changing the slug.
-      // If you are allowing slug edits you must supply originalSlug.
-      originalSlug = req.body.originalSlug || req.body.slug;
-      slug = req.body.slug;
-
-      slug = apos.slugify(slug, { allow: '/' });
-      // Make sure they don't turn it into a virtual page
-      if (!slug.match(/^\//)) {
-        slug = '/' + slug;
-      }
-      // Eliminate double slashes
-      slug = slug.replace(/\/+/g, '/');
-      // Eliminate trailing slashes
-      slug = slug.replace(/\/$/, '');
-      // ... But never eliminate the leading /
-      if (!slug.length) {
-        slug = '/';
-      }
-
-      async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
-
-      function getPage(callback) {
-
-        return apos.getPage(req, originalSlug, function(err, pageArg) {
-          page = pageArg;
-          if ((!err) && (!page)) {
-            err = 'Bad page';
-          }
-          return callback(err);
-        });
-      }
-
-      function permissions(callback) {
-        return apos.permissions(req, 'edit-page', page, function(err) {
-          // If there is no permissions error then we are cool
-          // enough to edit the page
-          return callback(err);
-        });
-      }
-
-      function updatePage(callback) {
-        page.title = title;
-        page.published = published;
-        page.slug = slug;
-        page.tags = tags;
-        type = determineType(req, page.type);
-        page.type = type.name;
-
-        if ((slug !== originalSlug) && (originalSlug === '/')) {
-          return callback('Cannot change the slug of the home page');
-        }
-
-        return async.series({
-          applyPermissions: function(callback) {
-            return self.applyPermissions(req, page, callback);
-          },
-          sanitizeTypeSettings: function(callback) {
-            return addSanitizedTypeData(req, page, type, callback);
-          },
-          // To be nice we keep the type settings around for other page types this page
-          // has formerly had. This avoids pain if the user switches and switches back.
-          // Alas it means we must keep validating them on save
-          sanitizeOtherTypeSettings: function(callback) {
-            return self.sanitizeOtherTypeSettings(req, page, callback);
-          },
-          putPage: function(callback) {
-            return apos.putPage(req, originalSlug, page, callback);
-          }
-        }, callback);
-      }
-
-      function redirect(callback) {
-        apos.updateRedirect(originalSlug, slug, callback);
-      }
-
-      function updateDescendants(callback) {
-        // We don't change the path here
-        self.updateDescendantPathsAndSlugs(page, page.path, originalSlug, callback);
-      }
-
-      function sendPage(err) {
-        if (err) {
-          console.log('the error:');
-          console.log(err);
-          res.statusCode = 500;
-          return res.send(err);
-        }
-        return res.send(JSON.stringify(page));
-      }
-    });
-
-    self.sanitizeOtherTypeSettings = function(req, page, callback) {
-      var raw = req.body.otherTypeSettings || {};
-      var sanitized = {};
-      return async.eachSeries(aposPages.types, function(type, callback) {
-        if (raw[type.name] && type.settings.sanitize) {
-          return type.settings.sanitize(raw[type.name] || {}, function(err, data) {
-            if (err) {
-              // Bad page settings for types not currently in effect are not a crisis
-              return callback(null);
-            }
-            sanitized[type.name] = data;
-            return callback(null);
-          });
-        } else {
-          return callback(null);
-        }
-      }, function(err) {
-        if (err) {
-          return callback(err);
-        }
-        page.otherTypeSettings = sanitized;
-        return callback(null);
-      });
-    };
-
-    self.applyPermissions = function(req, page, callback) {
-      var fields = [ 'viewGroupIds', 'viewPersonIds' ];
-
-      // Only admins can change editing permissions.
-      //
-      // TODO I should be checking this as a named permission in its own right
-
-      var userPermissions = req.user && req.user.permissions;
-      if (userPermissions.admin) {
-        fields = fields.concat([ 'editGroupIds', 'editPersonIds' ]);
-      }
-
-      var propagatePull;
-      var propagateAdd;
-      var propagateSet;
-      var propagateUnset;
-      var loginRequired = apos.sanitizeSelect(req.body.loginRequired, [ '', 'loginRequired', 'certainPeople' ], '');
-      if (loginRequired === '') {
-        delete page.loginRequired;
-      } else {
-        page.loginRequired = loginRequired;
-      }
-      if (apos.sanitizeBoolean(req.body.loginRequiredPropagate)) {
-        if (loginRequired !== '') {
-          propagateSet = { loginRequired: loginRequired };
-        } else {
-          propagateUnset = { loginRequired: 1 };
-        }
-      }
-
-      _.each(fields, function(field) {
-        page[field] = [];
-        _.each(req.body[field], function(datum) {
-          if (typeof(datum) !== 'object') {
-            return;
-          }
-          var removed = apos.sanitizeBoolean(datum.removed);
-          var propagate = apos.sanitizeBoolean(datum.propagate);
-          if (removed) {
-            if (propagate) {
-              if (!propagatePull) {
-                propagatePull = {};
-              }
-              if (!propagatePull[field]) {
-                propagatePull[field] = [];
-              }
-              propagatePull[field].push(datum.value);
-            }
-          } else {
-            if (propagate) {
-              if (!propagateAdd) {
-                propagateAdd = {};
-              }
-              if (!propagateAdd[field]) {
-                propagateAdd[field] = [];
-              }
-              propagateAdd[field].push(datum.value);
-            }
-            page[field].push(datum.value);
-            page.certainPeople = true;
-          }
-        });
-      });
-      if (propagatePull || propagateAdd || propagateSet || propagateUnset) {
-        var command = {};
-        if (propagatePull) {
-          command.$pull = { };
-          _.each(propagatePull, function(values, field) {
-            command.$pull[field] = { $in: values };
-          });
-        }
-        if (propagateAdd) {
-          command.$addToSet = { };
-          _.each(propagateAdd, function(values, field) {
-            command.$addToSet[field] = { $each: values };
-          });
-        }
-        if (propagateSet) {
-          command.$set = propagateSet;
-        }
-        if (propagateUnset) {
-          command.$unset = propagateUnset;
-        }
-        apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, callback);
-      } else {
-        return callback(null);
-      }
-    };
+    // Broken out to a method for testability
+    app.post('/apos-pages/edit', self._editRoute);
 
     // Move page to trashcan
     app.post('/apos-pages/delete', function(req, res) {

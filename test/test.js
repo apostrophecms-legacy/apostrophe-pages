@@ -535,5 +535,43 @@ describe('apostrophe-pages', function() {
       return done();
     });
   });
+
+  describe('edit page settings', function(done) {
+    it('propagates slug changes to children properly', function(done) {
+      var req = {
+        user: {
+          permissions: {
+            admin: true
+          }
+        },
+        body: {
+          originalSlug: '/contact/about',
+          slug: '/contact/about2',
+          title: 'About2',
+          published: true,
+          tags: [ 'one', 'two' ],
+          type: 'default'
+        }
+      };
+      var res = {
+        send: function(data) {
+          assert((!res.statusCode) || (res.statusCode === 200));
+          var page = JSON.parse(data);
+          assert(typeof(page) === 'object');
+          assert(page.slug === '/contact/about2');
+          return pages.getDescendants(apos.getTaskReq(), page, { depth: 2 }, function(err, childrenArg) {
+            children = childrenArg;
+            assert(!err);
+            assert(children.length === 2);
+            assert(children[0]._id === 'people');
+            assert(children[0].slug === '/contact/about2/people');
+            assert(children[1].slug === '/contact/about2/location');
+            return done();
+          });
+        }
+      };
+      return pages._editRoute(req, res);
+    });
+  });
 });
 
