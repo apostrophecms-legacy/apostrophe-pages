@@ -1960,6 +1960,7 @@ function pages(options, callback) {
       taskGroups.apostrophe.repairTree = function(apos, argv, callback) {
         var root;
         var pages;
+        var req = apos.getTaskReq();
         return async.series({
           getRoot: function(callback) {
             return apos.pages.findOne({ slug: '/' }, function(err, page) {
@@ -1981,6 +1982,28 @@ function pages(options, callback) {
           },
           fixChildren: function(callback) {
             return fixChildren(root, pages, callback);
+          },
+          rescueOrphans: function(callback) {
+            return apos.forEachPage({ slug: /^\// }, function(page, callback) {
+              var last = page.path.lastIndexOf('/');
+              if (last === -1) {
+                // It's the homepage
+                return callback(null);
+              }
+              var parentPath = page.path.substr(0, last);
+              return apos.pages.findOne({ path: parentPath }, function(err, parentPage) {
+                if (err) {
+                  return callback(err);
+                }
+                if (parentPage) {
+                  // We have a parent, no problem
+                  return callback(null);
+                }
+                // We have no parent. Consternation. Move to trash
+                console.log(page.slug + ' (' + page.title + ') has no parent, moving to trash');
+                return self.move(req, page.slug, '/trash', 'inside', callback);
+              });
+            }, callback);
           }
         }, callback);
         function fixChildren(parent, pages, callback) {
