@@ -536,7 +536,47 @@ describe('apostrophe-pages', function() {
     });
   });
 
-  describe('edit page settings', function(done) {
+  describe('add page', function() {
+    it('adds a new page beneath /contact called /contact/new-kid', function(done) {
+      var req = {
+        user: {
+          permissions: {
+            admin: true
+          }
+        },
+        body: {
+          parent: '/contact',
+          title: 'New Kid',
+          published: true,
+          tags: [ 'one', 'two' ],
+          type: 'default'
+        }
+      };
+      var res = {
+        send: function(data) {
+          assert((!res.statusCode) || (res.statusCode === 200));
+          var page = JSON.parse(data);
+          assert(typeof(page) === 'object');
+          assert(page.slug === '/contact/new-kid');
+          return apos.getPage(req, '/contact', function(err, page) {
+            assert(!err);
+            assert(page);
+            assert(page.slug === '/contact');
+            return pages.getDescendants(apos.getTaskReq(), page, { depth: 2 }, function(err, children) {
+              assert(children.length === 2);
+              assert(children[0].slug === '/contact/about');
+              assert(children[1].slug === '/contact/new-kid');
+              assert(children[1].path === 'home/contact/new-kid');
+              return done();
+            });
+          });
+        }
+      };
+      return pages._newRoute(req, res);
+    });
+  });
+
+  describe('edit page settings', function() {
     it('propagates slug changes to children properly', function(done) {
       var req = {
         user: {
@@ -572,6 +612,41 @@ describe('apostrophe-pages', function() {
       };
       return pages._editRoute(req, res);
     });
-  });
+   it('retains children when avoiding a duplicate slug error', function(done) {
+      var req = {
+        user: {
+          permissions: {
+            admin: true
+          }
+        },
+        body: {
+          originalSlug: '/contact/about2',
+          slug: '/contact/new-kid',
+          title: 'About2',
+          published: true,
+          tags: [ 'one', 'two' ],
+          type: 'default'
+        }
+      };
+      var res = {
+        send: function(data) {
+          assert((!res.statusCode) || (res.statusCode === 200));
+          var page = JSON.parse(data);
+          assert(typeof(page) === 'object');
+          assert(page.slug.match(/^\/contact\/new\-kid\d$/));
+          var baseSlug = page.slug;
+          return pages.getDescendants(apos.getTaskReq(), page, { depth: 2 }, function(err, childrenArg) {
+            children = childrenArg;
+            assert(!err);
+            assert(children.length === 2);
+            assert(children[0]._id === 'people');
+            assert(children[0].slug === baseSlug + '/people');
+            assert(children[1].slug === baseSlug + '/location');
+            return done();
+          });
+        }
+      };
+      return pages._editRoute(req, res);
+    });  });
 });
 

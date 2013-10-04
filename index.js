@@ -1141,12 +1141,115 @@ function pages(options, callback) {
     options.ui = true;
   }
 
+  // Broken out to a method for easy testing
+  self._newRoute = function(req, res) {
+    var parent;
+    var page;
+    var parentSlug;
+    var title;
+    var type;
+    var nextRank;
+    var published;
+    var tags;
+
+    title = req.body.title.trim();
+    // Validation is annoying, automatic cleanup is awesome
+    if (!title.length) {
+      title = 'New Page';
+    }
+
+    published = apos.sanitizeBoolean(req.body.published, true);
+    tags = apos.sanitizeTags(req.body.tags);
+    type = determineType(req);
+
+    async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
+
+    function getParent(callback) {
+      parentSlug = req.body.parent;
+      return apos.getPage(req, parentSlug, function(err, parentArg) {
+        parent = parentArg;
+        if ((!err) && (!parent)) {
+          err = 'Bad parent';
+        }
+        return callback(err);
+      });
+    }
+
+    function permissions(callback) {
+      return apos.permissions(req, 'edit-page', parent, function(err) {
+        // If there is no permissions error then note that we are cool
+        // enough to manage the page
+        return callback(err);
+      });
+    }
+
+    // TODO: there's a potential race condition here. It's not a huge deal,
+    // having two pages with the same rank just leads to them sorting
+    // randomly, the page tree is not destroyed. But we should have a
+    // cleanup task or a lock mechanism
+    function getNextRank(callback) {
+      self.getDescendants(req, parent, { depth: 1, orphan: 'any', trash: 'any' }, function(err, children) {
+        if (err) {
+          return callback(err);
+        }
+        nextRank = 1;
+        nextRank = _.reduce(children, function(memo, child) {
+          if (child.rank >= memo) {
+            memo = child.rank + 1;
+          }
+          return memo;
+        }, nextRank);
+        return callback(null);
+      });
+    }
+
+    function insertPage(callback) {
+      page = { title: title, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+
+      // Permissions initially match those of the parent
+      page.viewGroupIds = parent.viewGroupIds;
+      page.viewPersonIds = parent.viewPersonIds;
+      page.editGroupIds = parent.editGroupIds;
+      page.editPersonIds = parent.editPersonIds;
+      if (parent.loginRequired) {
+        page.loginRequired = parent.loginRequired;
+      }
+
+      return async.series({
+        applyPermissions: function(callback) {
+          return self.applyPermissions(req, page, callback);
+        },
+        sanitizeTypeSettings: function(callback) {
+          return addSanitizedTypeData(req, page, type, callback);
+        },
+        // To be nice we keep the type settings around for other page types the user
+        // thought about giving this page. This avoids pain if the user switches and
+        // switches back. Alas it means we must keep validating them on save
+        sanitizeOtherTypeSettings: function(callback) {
+          return self.sanitizeOtherTypeSettings(req, page, callback);
+        },
+        putPage: function(callback) {
+          return apos.putPage(req, page.slug, page, callback);
+        }
+      }, callback);
+    }
+
+    function sendPage(err) {
+      if (err) {
+        res.statusCode = 500;
+        return res.send('error');
+      }
+      return res.send(JSON.stringify(page));
+    }
+  };
+
   // Implementation of the /edit route which manipulates page settings. Broken out to
   // a method for easier unit testing
   self._editRoute = function(req, res) {
 
     var page;
     var originalSlug;
+    var originalPath;
     var slug;
     var title;
     var published;
@@ -1190,6 +1293,7 @@ function pages(options, callback) {
         if ((!err) && (!page)) {
           err = 'Bad page';
         }
+        originalPath = page.path;
         return callback(err);
       });
     }
@@ -1238,8 +1342,11 @@ function pages(options, callback) {
     }
 
     function updateDescendants(callback) {
-      // We don't change the path here
-      self.updateDescendantPathsAndSlugs(page, page.path, originalSlug, callback);
+      // Note we may very well have changed the path when adding random digits to keep
+      // the slug unique, since the code that detects the need for that can't distinguish
+      // whether it was the slug or the path that caused the error. So we have to propagate
+      // that to the descendants correctly
+      self.updateDescendantPathsAndSlugs(page, originalPath, originalSlug, callback);
     }
 
     function sendPage(err) {
@@ -1444,109 +1551,24 @@ function pages(options, callback) {
     self.pushAsset('template', 'reorganize', { when: 'user' });
     self.pushAsset('template', 'pageVersions', { when: 'user' });
 
-    app.post('/apos-pages/new', function(req, res) {
-      var parent;
-      var page;
-      var parentSlug;
-      var title;
-      var type;
-      var nextRank;
-      var published;
-      var tags;
-
-      title = req.body.title.trim();
-      // Validation is annoying, automatic cleanup is awesome
-      if (!title.length) {
-        title = 'New Page';
-      }
-
-      published = apos.sanitizeBoolean(req.body.published, true);
-      tags = apos.sanitizeTags(req.body.tags);
-      type = determineType(req);
-
-      async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
-
-      function getParent(callback) {
-        parentSlug = req.body.parent;
-        return apos.getPage(req, parentSlug, function(err, parentArg) {
-          parent = parentArg;
-          if ((!err) && (!parent)) {
-            err = 'Bad parent';
-          }
-          return callback(err);
-        });
-      }
-
-      function permissions(callback) {
-        return apos.permissions(req, 'edit-page', parent, function(err) {
-          // If there is no permissions error then note that we are cool
-          // enough to manage the page
-          return callback(err);
-        });
-      }
-
-      // TODO: there's a potential race condition here. It's not a huge deal,
-      // having two pages with the same rank just leads to them sorting
-      // randomly, the page tree is not destroyed. But we should have a
-      // cleanup task or a lock mechanism
-      function getNextRank(callback) {
-        self.getDescendants(req, parent, { depth: 1, orphan: 'any', trash: 'any' }, function(err, children) {
-          if (err) {
-            return callback(err);
-          }
-          nextRank = 1;
-          nextRank = _.reduce(children, function(memo, child) {
-            if (child.rank >= memo) {
-              memo = child.rank + 1;
-            }
-            return memo;
-          }, nextRank);
-          return callback(null);
-        });
-      }
-
-      function insertPage(callback) {
-        page = { title: title, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
-
-        // Permissions initially match those of the parent
-        page.viewGroupIds = parent.viewGroupIds;
-        page.viewPersonIds = parent.viewPersonIds;
-        page.editGroupIds = parent.editGroupIds;
-        page.editPersonIds = parent.editPersonIds;
-        if (parent.loginRequired) {
-          page.loginRequired = parent.loginRequired;
-        }
-
-        return async.series({
-          applyPermissions: function(callback) {
-            return self.applyPermissions(req, page, callback);
-          },
-          sanitizeTypeSettings: function(callback) {
-            return addSanitizedTypeData(req, page, type, callback);
-          },
-          // To be nice we keep the type settings around for other page types the user
-          // thought about giving this page. This avoids pain if the user switches and
-          // switches back. Alas it means we must keep validating them on save
-          sanitizeOtherTypeSettings: function(callback) {
-            return self.sanitizeOtherTypeSettings(req, page, callback);
-          },
-          putPage: function(callback) {
-            return apos.putPage(req, page.slug, page, callback);
-          }
-        }, callback);
-      }
-
-      function sendPage(err) {
-        if (err) {
-          res.statusCode = 500;
-          return res.send('error');
-        }
-        return res.send(JSON.stringify(page));
-      }
-    });
+    // Broken out to a method for testability
+    app.post('/apos-pages/new', self._newRoute);
 
     // Broken out to a method for testability
     app.post('/apos-pages/edit', self._editRoute);
+
+    // Test whether a slug is available for use
+    app.post('/apos-pages/slug-available', function(req, res) {
+      return apos.getPage(req, req.body.slug, function(err, page) {
+        if (err) {
+          return res.send({ status: 'error' });
+        }
+        if (page) {
+          return res.send({ status: 'taken' });
+        }
+        return res.send({ status: 'ok' });
+      });
+    });
 
     // Move page to trashcan
     app.post('/apos-pages/delete', function(req, res) {

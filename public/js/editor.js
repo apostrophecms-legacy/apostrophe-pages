@@ -157,7 +157,22 @@ $.extend(true, window, {
             }
           });
           function save(callback) {
-            return addOrEdit('edit', { slug: slug }, callback);
+            var newSlug = $el.find('[name=slug]').val();
+            if (newSlug === slug) {
+              // Slug not edited, we're fine
+              return go();
+            }
+            // Slug edited, make sure it's available; random digits frustrate people
+            return $.jsonCall('/apos-pages/slug-available', { slug: newSlug }, function(response) {
+              if (response.status !== 'ok') {
+                alert('That slug is already in use by another page.');
+                return callback('error');
+              }
+              return go();
+            });
+            function go() {
+              return addOrEdit('edit', { slug: slug }, callback);
+            }
           }
           return false;
         });
