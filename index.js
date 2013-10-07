@@ -125,6 +125,23 @@ function pages(options, callback) {
 
     return function(req, res) {
 
+      function now() {
+        var time = process.hrtime();
+        return time[0] + (time[1] / 1000000000.0);
+      }
+
+      function time(fn, name) {
+        return function(callback) {
+          var start = now();
+          return fn(function(err) {
+            // console.log(name + ': ' + (now() - start));
+            return callback(err);
+          });
+        };
+      }
+
+      var start = now();
+
       // Express doesn't provide the absolute URL the user asked for by default.
       // TODO: move this to middleware for even more general availability in Apostrophe.
       // See: https://github.com/visionmedia/express/issues/1377
@@ -133,7 +150,7 @@ function pages(options, callback) {
       }
 
       req.extras = {};
-      return async.series([page, permissions, relatives, load, notfound], main);
+      return async.series([time(page, 'page'), time(permissions, 'permissions'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound')], main);
 
       function page(callback) {
         // Get content for this page
@@ -481,10 +498,15 @@ function pages(options, callback) {
         // the template is rendering an alternative format
         // such as RSS
         if (req.xhr || req.query.xhr || (req.decorate === false)) {
-          return res.send(content);
+          return send(content);
         } else {
-          return res.send(self.decoratePageContent(args));
+          return send(self.decoratePageContent(args));
         }
+      }
+
+      function send(data) {
+        // console.log(now() - start);
+        return res.send(data);
       }
     };
   };
