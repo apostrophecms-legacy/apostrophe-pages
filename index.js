@@ -1140,6 +1140,36 @@ function pages(options, callback) {
     apos.pushGlobalCallWhen('user', 'aposPages.addType(?)', { name: type.name, label: type.label });
   };
 
+  // Get the index type objects corresponding to an instance or the name of an
+  // instance type. Instance types are a relevant concept for snippet pages,
+  // blog pages, event calendar pages, etc. and everything derived from them.
+  //
+  // In this pattern "instance" pages, like individual blogPosts, are outside
+  // of the page tree but "index" pages, like blogs, are in the page tree and
+  // display some or all of the blogPosts according to their own criteria.
+
+  self.getIndexTypes = function(instanceTypeOrInstance) {
+    var instanceTypeName = instanceTypeOrInstance.type || instanceTypeOrInstance;
+    var instanceTypes = [];
+    var i;
+    return _.filter(self.types, function(type) {
+      return (type._instance === instanceTypeName);
+    });
+  };
+
+  // Get the names of the index types corresponding to an instance type or the name of an
+  // instance type
+  self.getIndexTypeNames = function(instanceTypeOrInstance) {
+    return _.pluck(self.getIndexTypes(instanceTypeOrInstance), 'name');
+  };
+
+  // Returns the first index type object corresponding to an instance type or the
+  // name of an instance type. This is the object that is providing backend routes
+  // and management UI for editing instances
+  self.getManager = function(instanceTypeOrInstance) {
+    return self.getIndexTypes(instanceTypeOrInstance)[0];
+  };
+
   // May be called to re-order page types. Called automatically once at the end
   // of initialization, which is usually sufficient now that the `types` option
   // is permitted to contain types that will later be reinitialized by other
