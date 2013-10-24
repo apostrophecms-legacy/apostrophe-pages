@@ -1269,7 +1269,7 @@ function pages(options, callback) {
 
       return async.series({
         applyPermissions: function(callback) {
-          return self.applyPermissions(req, page, callback);
+          return self.applyPermissions(req, req.body, page, callback);
         },
         sanitizeTypeSettings: function(callback) {
           return addSanitizedTypeData(req, page, type, callback);
@@ -1372,7 +1372,7 @@ function pages(options, callback) {
 
       return async.series({
         applyPermissions: function(callback) {
-          return self.applyPermissions(req, page, callback);
+          return self.applyPermissions(req, req.body, page, callback);
         },
         sanitizeTypeSettings: function(callback) {
           return addSanitizedTypeData(req, page, type, callback);
@@ -1437,7 +1437,16 @@ function pages(options, callback) {
     });
   };
 
-  self.applyPermissions = function(req, page, callback) {
+  // Given a request object for a user with suitable permissions and a data object
+  // with loginRequired, loginRequiredPropagate, viewGroupIds, viewPersonIds,
+  // and (if the user is an admin) editGroupIds and editPersonIds arrays,
+  // apply those permissions to the page and (if loginRequiredPropagate is true)
+  // all of its descendants.
+  //
+  // data is usually req.body, however it is convenient to call this method from
+  // tasks as well.
+
+  self.applyPermissions = function(req, data, page, callback) {
     var fields = [ 'viewGroupIds', 'viewPersonIds' ];
 
     // Only admins can change editing permissions.
@@ -1453,13 +1462,13 @@ function pages(options, callback) {
     var propagateAdd;
     var propagateSet;
     var propagateUnset;
-    var loginRequired = apos.sanitizeSelect(req.body.loginRequired, [ '', 'loginRequired', 'certainPeople' ], '');
+    var loginRequired = apos.sanitizeSelect(data.loginRequired, [ '', 'loginRequired', 'certainPeople' ], '');
     if (loginRequired === '') {
       delete page.loginRequired;
     } else {
       page.loginRequired = loginRequired;
     }
-    if (apos.sanitizeBoolean(req.body.loginRequiredPropagate)) {
+    if (apos.sanitizeBoolean(data.loginRequiredPropagate)) {
       if (loginRequired !== '') {
         propagateSet = { loginRequired: loginRequired };
       } else {
@@ -1469,7 +1478,7 @@ function pages(options, callback) {
 
     _.each(fields, function(field) {
       page[field] = [];
-      _.each(req.body[field], function(datum) {
+      _.each(data[field], function(datum) {
         if (typeof(datum) !== 'object') {
           return;
         }
