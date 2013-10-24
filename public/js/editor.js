@@ -254,7 +254,12 @@ function AposPages() {
         if (oldTypeName) {
           var oldType = aposPages.getType(oldTypeName);
           if (oldType.settings) {
-            otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $el.find('[data-type-details]'));
+            var $details = $el.find('[data-type-details]');
+            // Don't bomb if the dialog was dismissed and the old type's settings aren't
+            // present right now
+            if ($details.length) {
+              otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $details);
+            }
           }
           $el.find('[data-type-details]').html('');
         }
