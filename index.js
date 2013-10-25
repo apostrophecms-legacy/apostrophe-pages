@@ -1443,6 +1443,22 @@ function pages(options, callback) {
   // apply those permissions to the page and (if loginRequiredPropagate is true)
   // all of its descendants.
   //
+  // The value of each entry in viewPersonIds and the other arrays must be EITHER:
+  //
+  // 1. A simple array of person or group IDs, or:
+  //
+  // 2. An object with `value`, `propagate`, and `removed` properties. The `value`
+  // property must be the id of the person or group. The `propagate` property
+  // indicates that we wish to propagate this change to descendant pages.
+  // The `removed` property indicates that we have chosen to remove this id
+  // rather than add it.
+  //
+  // If you choose option #1, changes are NOT propagated to child pages.
+  //
+  // This method does NOT actually save the page object, although it DOES modify
+  // any descendant pages. It is YOUR responsibility to save the page object
+  // afterwards, usually via putPage.
+  //
   // data is usually req.body, however it is convenient to call this method from
   // tasks as well.
 
@@ -1475,13 +1491,21 @@ function pages(options, callback) {
         propagateUnset = { loginRequired: 1 };
       }
     }
-
     _.each(fields, function(field) {
       page[field] = [];
       _.each(data[field], function(datum) {
         if (typeof(datum) !== 'object') {
-          return;
+          if (typeof(datum === 'string')) {
+            datum = {
+              value: datum,
+              propagate: false,
+              removed: false
+            };
+          } else {
+            return;
+          }
         }
+
         var removed = apos.sanitizeBoolean(datum.removed);
         var propagate = apos.sanitizeBoolean(datum.propagate);
         if (removed) {
@@ -1529,7 +1553,7 @@ function pages(options, callback) {
       if (propagateUnset) {
         command.$unset = propagateUnset;
       }
-      apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, callback);
+      return apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, callback);
     } else {
       return callback(null);
     }
