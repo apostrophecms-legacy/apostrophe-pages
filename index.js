@@ -572,6 +572,10 @@ function pages(options, callback) {
       if (match) {
         args.extraHead = match[1];
       }
+      match = args.content.match(/<\!\-\- APOS\-SEO\-DESCRIPTION ([\s\S]*?) \-\-\>/);
+      if (match) {
+        args.seoDescription = match[1];
+      }
 
       // Allow raw HTML slots on a true page update, without the risk
       // of document.write blowing up a page during a partial update.
@@ -1204,16 +1208,18 @@ function pages(options, callback) {
     var page;
     var parentSlug;
     var title;
+    var seoDescription;
     var type;
     var nextRank;
     var published;
     var tags;
 
-    title = req.body.title.trim();
+    title = apos.sanitizeString(req.body.title).trim();
     // Validation is annoying, automatic cleanup is awesome
     if (!title.length) {
       title = 'New Page';
     }
+    seoDescription = apos.sanitizeString(req.body.seoDescription).trim();
 
     published = apos.sanitizeBoolean(req.body.published, true);
     tags = apos.sanitizeTags(req.body.tags);
@@ -1261,7 +1267,7 @@ function pages(options, callback) {
     }
 
     function insertPage(callback) {
-      page = { title: title, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+      page = { title: title, seoDescription: seoDescription, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
 
       // Permissions initially match those of the parent
       page.viewGroupIds = parent.viewGroupIds;
@@ -1312,8 +1318,10 @@ function pages(options, callback) {
     var published;
     var tags;
     var type;
+    var seoDescription;
 
-    title = req.body.title.trim();
+    title = apos.sanitizeString(req.body.title).trim();
+    seoDescription = apos.sanitizeString(req.body.seoDescription).trim();
     // Validation is annoying, automatic cleanup is awesome
     if (!title.length) {
       title = 'Untitled Page';
@@ -1365,6 +1373,7 @@ function pages(options, callback) {
 
     function updatePage(callback) {
       page.title = title;
+      page.seoDescription = seoDescription;
       page.published = published;
       page.slug = slug;
       page.tags = tags;

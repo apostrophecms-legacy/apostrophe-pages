@@ -8,6 +8,7 @@
       {# JS will populate it #}
       {{ formSelect('type', 'Type', []) }}
       {{ formBoolean('published', 'Published') }}
+      {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
 
       {# PERMISSIONS #}
       {# Toggles open apos-view-permissions #}
