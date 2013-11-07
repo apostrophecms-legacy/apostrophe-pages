@@ -161,6 +161,8 @@ function AposPages() {
             $el.find('[name=published]').val(published);
             $el.find('[name=type]').val(apos.data.aposPages.page.type);
             $el.find('[name=title]').val(apos.data.aposPages.page.title);
+            var $seoDescription = $el.find('[name=seoDescription]');
+            $seoDescription.val(apos.data.aposPages.page.seoDescription || '');
             $el.find('[name=slug]').val(slug);
             apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
 
@@ -290,6 +292,7 @@ function AposPages() {
         var data = {
           title: $el.find('[name=title]').val(),
           slug: $el.find('[name=slug]').val(),
+          seoDescription: $el.find('[name=seoDescription]').val(),
           type: $el.find('[name=type]').val(),
           published: $el.find('[name=published]').val(),
           tags: $el.find('[data-name="tags"]').selective('get'),
