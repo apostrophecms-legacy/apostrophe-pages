@@ -322,7 +322,12 @@ function pages(options, callback) {
                 }
                 // Provide an object with an empty areas property if
                 // the page doesn't exist yet. This simplifies page type templates
-                req.extras[item] = page ? page : { areas: [] };
+                // The new syntax for aposArea() requires a more convincing fake page!
+                // Populate slug and permissions correctly
+                req.extras[item] = page ? page : { slug: item, areas: [] };
+                if (!page) {
+                  apos.addPermissionsToPages(req, [req.extras[item]]);
+                }
                 return callback(null);
               });
             };
