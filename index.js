@@ -985,13 +985,13 @@ function pages(options, callback) {
       moved.path = newPath;
       // If the old slug wasn't customized, update the slug as well as the path
       if (parent._id !== oldParent._id) {
-        var matchOldParentSlugPrefix = new RegExp('^' + RegExp.quote(addSlashIfNeeded(oldParent.slug)));
+        var matchOldParentSlugPrefix = new RegExp('^' + RegExp.quote(apos.addSlashIfNeeded(oldParent.slug)));
         if (moved.slug.match(matchOldParentSlugPrefix)) {
           var slugStem = parent.slug;
           if (slugStem !== '/') {
             slugStem += '/';
           }
-          moved.slug = moved.slug.replace(matchOldParentSlugPrefix, addSlashIfNeeded(parent.slug));
+          moved.slug = moved.slug.replace(matchOldParentSlugPrefix, apos.addSlashIfNeeded(parent.slug));
           changed.push({
             _id: moved._id,
             slug: moved.slug
@@ -1267,7 +1267,7 @@ function pages(options, callback) {
     }
 
     function insertPage(callback) {
-      page = { title: title, seoDescription: seoDescription, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+      page = { title: title, seoDescription: seoDescription, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
 
       // Permissions initially match those of the parent
       page.viewGroupIds = parent.viewGroupIds;
@@ -2164,11 +2164,5 @@ function pages(options, callback) {
     // Unique and sparse together mean that many pages can have no path,
     // but any paths that do exist must be unique
     return apos.pages.ensureIndex({ path: 1 }, { safe: true, unique: true, sparse: true }, callback);
-  }
-
-  function addSlashIfNeeded(path) {
-    path += '/';
-    path = path.replace(/\/\/$/, '/');
-    return path;
   }
 }
