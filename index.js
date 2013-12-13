@@ -1179,6 +1179,18 @@ function pages(options, callback) {
     return self.getIndexTypes(instanceTypeOrInstance)[0];
   };
 
+  // Get all the instance type names: the type names which have a corresponding
+  // index type - snippet, event, blogPost, etc.
+  self.getAllInstanceTypeNames = function() {
+    var result = [];
+    _.each(self.types, function(type) {
+      if (type._instance) {
+        result.push(type._instance);
+      }
+    });
+    return result;
+  };
+
   // May be called to re-order page types. Called automatically once at the end
   // of initialization, which is usually sufficient now that the `types` option
   // is permitted to contain types that will later be reinitialized by other
