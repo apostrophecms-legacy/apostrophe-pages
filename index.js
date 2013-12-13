@@ -1567,7 +1567,7 @@ function pages(options, callback) {
       if (propagateUnset) {
         command.$unset = propagateUnset;
       }
-      return apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, callback);
+      return apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, { multi: true }, callback);
     } else {
       return callback(null);
     }
