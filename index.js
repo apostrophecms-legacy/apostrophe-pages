@@ -455,6 +455,14 @@ function pages(options, callback) {
         // triggers this event
         calls += '\n$("body").trigger("aposReady");\n';
 
+        // JavaScript may want to know who the user is. Prune away
+        // big stuff like their profile areas
+        if (req.user) {
+          // This should be gone already but let's be doubly sure!
+          delete req.user.password;
+          req.pushData({ user: self.prunePage(req.user) });
+        }
+
         var args = {
           edit: req.edit,
           // Make sure we pass the slug of the page, not the
