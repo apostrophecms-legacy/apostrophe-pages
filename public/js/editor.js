@@ -260,7 +260,13 @@ function AposPages() {
             // Don't bomb if the dialog was dismissed and the old type's settings aren't
             // present right now
             if ($details.length) {
-              otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $details);
+              if (oldType.settings.serialize.length === 2) {
+                otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $details);
+              } else {
+                oldType.settings.serialize($el, $details, function(err, info) {
+                  otherTypeSettings[oldTypeName] = info;
+                });
+              }
             }
           }
           $el.find('[data-type-details]').html('');
@@ -281,7 +287,14 @@ function AposPages() {
           if (!typeDefaults) {
             typeDefaults = {};
           }
-          type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'));
+          type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'), function(err) {
+            // NOTE: not all unserialize implementations invoke a callback yet.
+            // .length should be checked.
+            //
+            // TODO: refreshType should take a callback of its own but
+            // for now there is nothing to invoke and nothing that absolutely
+            // depends on running after it
+          });
         }
       }
 
@@ -309,26 +322,45 @@ function AposPages() {
         data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get');
 
         _.extend(data, { parent: options.parent, originalSlug: options.slug });
-        if (type) {
-          if (type.settings && type.settings.serialize) {
+
+        function serializeThenSave() {
+          if (!(type && type.settings && type.settings.serialize)) {
+            return save();
+          }
+          if (type.settings.serialize.length === 2) {
             data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
+            return save();
           }
-        }
-        $.ajax(
-          {
-            url: '/apos-pages/' + action,
-            data: data,
-            type: 'POST',
-            dataType: 'json',
-            success: function(data) {
-              window.location.href = aposPages.options.root + data.slug;
-            },
-            error: function() {
-              alert('Server error');
-              callback('Server error');
+          // Newfangled serializer takes a callback
+          return type.settings.serialize($el, $el.find('[data-type-details]'), function(err, typeSettings) {
+            if (err) {
+              // Block
+              return;
             }
-          }
-        );
+            data.typeSettings = typeSettings;
+            return save();
+          });
+        }
+
+        function save() {
+          $.ajax(
+            {
+              url: '/apos-pages/' + action,
+              data: data,
+              type: 'POST',
+              dataType: 'json',
+              success: function(data) {
+                window.location.href = aposPages.options.root + data.slug;
+              },
+              error: function() {
+                alert('Server error');
+                callback('Server error');
+              }
+            }
+          );
+        }
+
+        serializeThenSave();
         return false;
       }
 
@@ -440,9 +472,7 @@ function AposPages() {
           });
           $tree.on('click', '[data-visit]', function() {
             var nodeId = $(this).attr('data-node-id');
-            apos.log(nodeId);
             var node = $tree.tree('getNodeById', nodeId);
-            apos.log(node);
             // TODO: this is an assumption about where the root of the page tree
             // is being served
             window.location.href = node.slug;

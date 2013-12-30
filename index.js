@@ -1180,11 +1180,29 @@ function pages(options, callback) {
     return _.pluck(self.getIndexTypes(instanceTypeOrInstance), 'name');
   };
 
-  // Returns the first index type object corresponding to an instance type or the
-  // name of an instance type. This is the object that is providing backend routes
-  // and management UI for editing instances
-  self.getManager = function(instanceTypeOrInstance) {
-    return self.getIndexTypes(instanceTypeOrInstance)[0];
+  // Returns the manager object corresponding to a type name or an object of the type.
+  //
+  // Some manager objects are responsible for two types: an instance type
+  // ("blogPost") that does not appear in the page tree, and an index type
+  // ("blog") that does. In such cases the manager object has an _instance
+  // property which indicates the instance type name and a `name` property
+  // which indicates the index type name.
+  //
+  // If the manager object has an _instance property, then
+  // it will have both .get and .getIndexes methods for retrieving the
+  // instances and the indexes, respectively. If not, then the
+  // .get method should always be used.
+
+  self.getManager = function(nameOrObject) {
+    var name = nameOrObject.type || nameOrObject;
+    var instanceManager = self.getIndexTypes(name)[0];
+    if (instanceManager) {
+      return instanceManager;
+    }
+    var indexManager = _.find(self.types, function(type) {
+      return type.name === name;
+    });
+    return indexManager;
   };
 
   // Get all the instance type names: the type names which have a corresponding
