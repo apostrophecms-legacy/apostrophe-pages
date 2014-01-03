@@ -15,6 +15,7 @@ function pages(options, callback) {
   var app = options.app;
   var self = this;
   var aposPages = this;
+  self._action = '/apos-pages';
 
   // Usage: app.get('*', pages.serve({ typePath: __dirname + '/views/pages' }))
   //
@@ -113,6 +114,12 @@ function pages(options, callback) {
   // If you do not set req.page the normal page-not-found behavior is applied.
   // Make sure you specify at least an areas property. If you do not supply a
   // type property, 'default' is assumed.
+  //
+  // A JSON interface is also built in for each page: if you add
+  // ?pageInformation=json to the URL, a JSON description of the page
+  // is returned, including any information added to the page object
+  // by loader functions. This is available only to users with
+  // editing permissions.
 
   self.serve = function(options) {
 
@@ -484,6 +491,13 @@ function pages(options, callback) {
         _.defaults(args, req.extras);
 
         var content;
+
+        // A simple way to access everything we know about the page
+        // in JSON format. Allow this only if we have editing privileges
+        // on the page.
+        if ((req.query.pageInformation === 'json') && args.page && (args.page._edit)) {
+          return res.send(args.page);
+        }
 
         if (typeof(req.template) === 'string') {
           var path = __dirname + '/views/' + req.template;
@@ -1673,7 +1687,7 @@ function pages(options, callback) {
         options = {};
       }
       options.fs = __dirname;
-      options.web = '/apos-pages';
+      options.web = self._action + '';
       return apos.pushAsset(type, name, options);
     };
 
@@ -1689,13 +1703,13 @@ function pages(options, callback) {
     self.pushAsset('template', 'pageVersions', { when: 'user' });
 
     // Broken out to a method for testability
-    app.post('/apos-pages/new', self._newRoute);
+    app.post(self._action + '/new', self._newRoute);
 
     // Broken out to a method for testability
-    app.post('/apos-pages/edit', self._editRoute);
+    app.post(self._action + '/edit', self._editRoute);
 
     // Test whether a slug is available for use
-    app.post('/apos-pages/slug-available', function(req, res) {
+    app.post(self._action + '/slug-available', function(req, res) {
       return apos.getPage(req, req.body.slug, function(err, page) {
         if (err) {
           return res.send({ status: 'error' });
@@ -1708,7 +1722,7 @@ function pages(options, callback) {
     });
 
     // Move page to trashcan
-    app.post('/apos-pages/delete', function(req, res) {
+    app.post(self._action + '/delete', function(req, res) {
       var trash;
       var page;
       var parent;
@@ -1776,7 +1790,7 @@ function pages(options, callback) {
       }
     });
 
-    app.get('/apos-pages/get-jqtree', function(req, res) {
+    app.get(self._action + '/get-jqtree', function(req, res) {
       var page;
       apos.getPage(req, '/', function(err, page) {
         if (!page) {
@@ -1827,10 +1841,8 @@ function pages(options, callback) {
     });
 
     // Simple JSON access to pages by id. Reorganize uses this to figure out
-    // if the page we're sitting on has been moved out from under us. Does
-    // *not* run loaders, it's meant for a quick peek at data that lives
-    // directly in the page
-    app.get('/apos-pages/info', function(req, res) {
+    // if the page we're sitting on has been moved out from under us.
+    app.get(self._action + '/info', function(req, res) {
       var _id = req.query._id;
       // Do a simple mongo fetch, we don't want the loaders invoked
       apos.pages.findOne({ _id: _id }, function(err, page) {
@@ -1848,9 +1860,97 @@ function pages(options, callback) {
       });
     });
 
+    // Extension point for criteria used to fetch pages that are part of
+    // the page tree (their slugs begin with /).
+
+    self.addExtraAutocompleteCriteria = function(req, criteria, options) {
+    };
+
+    // Can be overridden if titles aren't enough to identify pages for autocomplete
+    self.getAutocompleteTitle = function(snippet) {
+      return snippet.title;
+    };
+
+    // For performance this is minimal but if you need more data in your JSON
+    // response you can have it
+    self.getAutocompleteFields = function() {
+      return { title: 1, _id: 1 };
+    };
+
+    // Autocomplete for Pages in the Page Tree
+    //
+    // The autocomplete route returns an array of objects with
+    // label and value properties, suitable for use with
+    // $.selective. The label is the title, the value
+    // is the id of the snippet.
+    //
+    // Send either a `term` parameter, used for autocomplete search,
+    // or a `values` array parameter, used to fetch title information
+    // about an existing list of ids. If neither is present the
+    // request is assumed to be for an empty array of ids and an
+    // empty array is returned, not a 404.
+    //
+    // GET and POST are supported to allow for large `values`
+    // arrays.
+    //
+    // "limit" and "skip" are also supported, with a default of
+    // limit 50, skip 0. They must be in the query string.
+
+    app.all(self._action + '/autocomplete', function(req, res) {
+      var criteria = { slug: /^\// };
+      var options = {
+        fields: self.getAutocompleteFields(),
+        limit: req.query.limit || 50,
+        skip: req.query.skip
+      };
+      var data = (req.method === 'POST') ? req.body : req.query;
+      if (data.term !== undefined) {
+        options.titleSearch = data.term;
+      } else if (data.values !== undefined) {
+        criteria._id = { $in: data.values };
+      } else {
+        // Since arrays in REST queries are ambiguous,
+        // treat the absence of either parameter as an
+        // empty `ids` array
+        return res.send(JSON.stringify([]));
+      }
+      if (req.query.type) {
+        criteria.type = req.query.type;
+      }
+      if (data.values && data.values.length && (req.query.limit === undefined)) {
+        // We are loading specific items to repopulate a control,
+        // so get all of them
+        delete options.limit;
+      }
+      // If requested, allow autocomplete to find unpublished
+      // things (published === 'any'). Note that this is still
+      // restricted by the permissions of the user making the request.
+      if (data.published !== undefined) {
+        options.published = data.published;
+      }
+      self.addExtraAutocompleteCriteria(req, criteria, options);
+      // Format it as value & id properties for compatibility with jquery UI autocomplete
+      apos.get(req, criteria, options, function(err, results) {
+        if (err) {
+          res.statusCode = 500;
+          return res.send('error');
+        }
+        var pages = results.pages;
+        // Put the pages in id order, $in does NOT do this
+        if (req.query.values) {
+          pages = self._apos.orderById(req.query.values, pages);
+        }
+        return res.send(
+          JSON.stringify(_.map(pages, function(snippet) {
+              return { label: self.getAutocompleteTitle(snippet), value: snippet._id };
+          }))
+        );
+      });
+    });
+
     // Return past versions of a page (just the metadata and the diff),
     // rendered via the versions.html template
-    app.get('/apos-pages/versions', function(req, res) {
+    app.get(self._action + '/versions', function(req, res) {
       var _id = req.query._id;
       var page;
       var versions;
@@ -1890,7 +1990,7 @@ function pages(options, callback) {
       self.revertListeners.push(listener);
     };
 
-    app.post('/apos-pages/revert', function(req, res) {
+    app.post(self._action + '/revert', function(req, res) {
       var pageId = req.body.page_id;
       var versionId = req.body.version_id;
       var page;
@@ -1959,7 +2059,7 @@ function pages(options, callback) {
     // Decide whether to honor a jqtree 'move' event and carry it out.
     // This is done by adjusting the path and level properties of the moved page
     // as well as the rank properties of that page and its new and former peers
-    app.post('/apos-pages/move-jqtree', function(req, res) {
+    app.post(self._action + '/move-jqtree', function(req, res) {
       var movedSlug = apos.sanitizeString(req.body.moved);
       var targetSlug = apos.sanitizeString(req.body.target);
       var position = req.body.position;
@@ -2079,7 +2179,7 @@ function pages(options, callback) {
     // click is much cheaper than determining the perfect URL for every search
     // result in the list, most of which will never be clicked on
 
-    app.get('/apos-pages/search-result', function(req, res) {
+    app.get(self._action + '/search-result', function(req, res) {
       var slug = req.query.slug;
       return apos.getPage(req, slug, function(err, page) {
         if (!page) {
@@ -2108,7 +2208,7 @@ function pages(options, callback) {
 
     // Serve our assets. This is the final route so it doesn't
     // beat out the rest
-    app.get('/apos-pages/*', apos.static(__dirname + '/public'));
+    app.get(self._action + '/*', apos.static(__dirname + '/public'));
 
     apos.addLocal('aposPagesMenu', function(options) {
       // Pass the options as one argument so they can be passed on
