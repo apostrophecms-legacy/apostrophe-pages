@@ -49,6 +49,9 @@ function AposPages() {
   // display some or all of the blogPosts according to their own criteria.
 
   self.getIndexTypes = function(instanceTypeOrInstance) {
+    if (!instanceTypeOrInstance) {
+      throw 'getIndexTypes called with no type. You probably forgot to specify withType in your schema.';
+    }
     var types = apos.data.aposPages.types;
     var instanceTypeName = instanceTypeOrInstance.type || instanceTypeOrInstance;
     var instanceTypes = [];
@@ -105,7 +108,7 @@ function AposPages() {
           init: function(callback) {
 
             // We now can pass an argument to this function that allows a certain page type
-            // (identified in the data attribute "page-type") to be automtically selected.
+            // (identified in the data attribute "page-type") to be automatically selected.
             populateType(pageType);
 
             // Copy parent's published status
@@ -144,51 +147,57 @@ function AposPages() {
       $('body').on('click', '.apos-edit-page', function() {
         var slug = $(this).data('slug');
 
-        $el = apos.modalFromTemplate('.apos-edit-page-settings', {
-          save: save,
-          init: function(callback) {
-            populateType();
+        // Get a more robust JSON representation that includes
+        // joined objects if any
+        $.getJSON(aposPages.options.root + apos.data.aposPages.page.slug + '?pageInformation=json', function(data) {
+          apos.data.aposPages.page = data;
+          $el = apos.modalFromTemplate('.apos-edit-page-settings', {
+            save: save,
+            init: function(callback) {
+              populateType();
 
-            // TODO: refactor this frequently used dance of boolean values
-            // into editor.js or content.js
-            var published = apos.data.aposPages.page.published;
-            if (published === undefined) {
-              published = 1;
-            } else {
-              // Simple POST friendly boolean values
-              published = published ? '1' : '0';
+              // TODO: refactor this frequently used dance of boolean values
+              // into editor.js or content.js
+              var published = apos.data.aposPages.page.published;
+              if (published === undefined) {
+                published = 1;
+              } else {
+                // Simple POST friendly boolean values
+                published = published ? '1' : '0';
+              }
+              $el.find('[name=published]').val(published);
+              $el.find('[name=type]').val(apos.data.aposPages.page.type);
+              $el.find('[name=title]').val(apos.data.aposPages.page.title);
+              var $seoDescription = $el.find('[name=seoDescription]');
+              $seoDescription.val(apos.data.aposPages.page.seoDescription || '');
+              $el.find('[name=slug]').val(slug);
+              apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
+
+              // Persistence for settings made when the page had a different type.
+              // Makes Apostrophe forgiving of otherwise serious mistakes, like
+              // adding 20 hand-curated choices in custom page settings for a type,
+              // switching to another type, saving, and then changing your mind
+              if (apos.data.aposPages.page.otherTypeSettings) {
+                otherTypeSettings = apos.data.aposPages.page.otherTypeSettings;
+              }
+
+              refreshType();
+
+              enablePermissions(apos.data.aposPages.page);
+
+              // Watch the title for changes, update the slug - but only if
+              // the slug was in sync with the title to start with
+
+              var $slug = $el.find('[name=slug]');
+              var $title = $el.find('[name=title]');
+
+              apos.suggestSlugOnTitleEdits($slug, $title);
+
+              return callback(null);
             }
-            $el.find('[name=published]').val(published);
-            $el.find('[name=type]').val(apos.data.aposPages.page.type);
-            $el.find('[name=title]').val(apos.data.aposPages.page.title);
-            var $seoDescription = $el.find('[name=seoDescription]');
-            $seoDescription.val(apos.data.aposPages.page.seoDescription || '');
-            $el.find('[name=slug]').val(slug);
-            apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
-
-            // Persistence for settings made when the page had a different type.
-            // Makes Apostrophe forgiving of otherwise serious mistakes, like
-            // adding 20 hand-curated choices in custom page settings for a type,
-            // switching to another type, saving, and then changing your mind
-            if (apos.data.aposPages.page.otherTypeSettings) {
-              otherTypeSettings = apos.data.aposPages.page.otherTypeSettings;
-            }
-
-            refreshType();
-
-            enablePermissions(apos.data.aposPages.page);
-
-            // Watch the title for changes, update the slug - but only if
-            // the slug was in sync with the title to start with
-
-            var $slug = $el.find('[name=slug]');
-            var $title = $el.find('[name=title]');
-
-            apos.suggestSlugOnTitleEdits($slug, $title);
-
-            return callback(null);
-          }
+          });
         });
+
         function save(callback) {
           var newSlug = $el.find('[name=slug]').val();
           if (newSlug === slug) {
@@ -260,7 +269,13 @@ function AposPages() {
             // Don't bomb if the dialog was dismissed and the old type's settings aren't
             // present right now
             if ($details.length) {
-              otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $details);
+              if (oldType.settings.serialize.length === 2) {
+                otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $details);
+              } else {
+                oldType.settings.serialize($el, $details, function(err, info) {
+                  otherTypeSettings[oldTypeName] = info;
+                });
+              }
             }
           }
           $el.find('[data-type-details]').html('');
@@ -281,7 +296,14 @@ function AposPages() {
           if (!typeDefaults) {
             typeDefaults = {};
           }
-          type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'));
+          type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'), function(err) {
+            // NOTE: not all unserialize implementations invoke a callback yet.
+            // .length should be checked.
+            //
+            // TODO: refreshType should take a callback of its own but
+            // for now there is nothing to invoke and nothing that absolutely
+            // depends on running after it
+          });
         }
       }
 
@@ -309,26 +331,45 @@ function AposPages() {
         data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get');
 
         _.extend(data, { parent: options.parent, originalSlug: options.slug });
-        if (type) {
-          if (type.settings && type.settings.serialize) {
+
+        function serializeThenSave() {
+          if (!(type && type.settings && type.settings.serialize)) {
+            return save();
+          }
+          if (type.settings.serialize.length === 2) {
             data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
+            return save();
           }
-        }
-        $.ajax(
-          {
-            url: '/apos-pages/' + action,
-            data: data,
-            type: 'POST',
-            dataType: 'json',
-            success: function(data) {
-              window.location.href = aposPages.options.root + data.slug;
-            },
-            error: function() {
-              alert('Server error');
-              callback('Server error');
+          // Newfangled serializer takes a callback
+          return type.settings.serialize($el, $el.find('[data-type-details]'), function(err, typeSettings) {
+            if (err) {
+              // Block
+              return;
             }
-          }
-        );
+            data.typeSettings = typeSettings;
+            return save();
+          });
+        }
+
+        function save() {
+          $.ajax(
+            {
+              url: '/apos-pages/' + action,
+              data: data,
+              type: 'POST',
+              dataType: 'json',
+              success: function(data) {
+                window.location.href = aposPages.options.root + data.slug;
+              },
+              error: function() {
+                alert('Server error');
+                callback('Server error');
+              }
+            }
+          );
+        }
+
+        serializeThenSave();
         return false;
       }
 
@@ -440,9 +481,7 @@ function AposPages() {
           });
           $tree.on('click', '[data-visit]', function() {
             var nodeId = $(this).attr('data-node-id');
-            apos.log(nodeId);
             var node = $tree.tree('getNodeById', nodeId);
-            apos.log(node);
             // TODO: this is an assumption about where the root of the page tree
             // is being served
             window.location.href = node.slug;
