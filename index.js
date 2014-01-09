@@ -2171,6 +2171,7 @@ function pages(options, callback) {
         { highSearchText: q },
         { lowSearchText: q }
       ];
+      apos.emit('addSearchCriteria', req, queries);
 
       // TODO: add some more variants considered even better matches, such as
       // exact word boundaries rather than embedded words. We can afford it,
