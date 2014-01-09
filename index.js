@@ -1256,6 +1256,26 @@ function pages(options, callback) {
 
   // Broken out to a method for easy testing
   self._newRoute = function(req, res) {
+    var data = req.body;
+    return self.insertPage(req, req.body, function(err, page) {
+      if (err) {
+        res.statusCode = 500;
+        return res.send('error');
+      }
+      return res.send(JSON.stringify(page));
+    });
+  };
+
+  // Insert a page. The req argument is examined for permissions purposes.
+  // The data argument is consulted for title, parent (slug of parent page),
+  // published, tags, type, seoDescription, typeSettings and otherTypeSettings,
+  // and is validated, so that you may safely pass it in directly from the browser
+  // (req.body), but this method may also be called to add pages for other reasons.
+  // If data.areas is passed then content areas may be inserted directly at
+  // insert time; this is useful during import operations. Areas are also
+  // sanitized. The new page is the last child of its parent.
+
+  self.insertPage = function(req, data, callback) {
     var parent;
     var page;
     var parentSlug;
@@ -1266,21 +1286,26 @@ function pages(options, callback) {
     var published;
     var tags;
 
-    title = apos.sanitizeString(req.body.title).trim();
+    title = apos.sanitizeString(data.title).trim();
     // Validation is annoying, automatic cleanup is awesome
     if (!title.length) {
       title = 'New Page';
     }
-    seoDescription = apos.sanitizeString(req.body.seoDescription).trim();
+    seoDescription = apos.sanitizeString(data.seoDescription).trim();
 
-    published = apos.sanitizeBoolean(req.body.published, true);
-    tags = apos.sanitizeTags(req.body.tags);
-    type = determineType(req);
+    published = apos.sanitizeBoolean(data.published, true);
+    tags = apos.sanitizeTags(data.tags);
+    type = determineType(data.type);
 
-    async.series([ getParent, permissions, getNextRank, insertPage ], sendPage);
+    return async.series([ getParent, permissions, getNextRank, insertPage ], function(err) {
+      if (err) {
+        return callback(err);
+      }
+      return callback(null, page);
+    });
 
     function getParent(callback) {
-      parentSlug = req.body.parent;
+      parentSlug = data.parent;
       return apos.getPage(req, parentSlug, function(err, parentArg) {
         parent = parentArg;
         if ((!err) && (!parent)) {
@@ -1303,17 +1328,12 @@ function pages(options, callback) {
     // randomly, the page tree is not destroyed. But we should have a
     // cleanup task or a lock mechanism
     function getNextRank(callback) {
-      self.getDescendants(req, parent, { depth: 1, orphan: 'any', trash: 'any' }, function(err, children) {
+
+      return self.getNextRank(parent, function(err, rank) {
         if (err) {
           return callback(err);
         }
-        nextRank = 1;
-        nextRank = _.reduce(children, function(memo, child) {
-          if (child.rank >= memo) {
-            memo = child.rank + 1;
-          }
-          return memo;
-        }, nextRank);
+        nextRank = rank;
         return callback(null);
       });
     }
@@ -1332,30 +1352,74 @@ function pages(options, callback) {
 
       return async.series({
         applyPermissions: function(callback) {
-          return self.applyPermissions(req, req.body, page, callback);
+          return self.applyPermissions(req, data, page, callback);
         },
         sanitizeTypeSettings: function(callback) {
-          return addSanitizedTypeData(req, page, type, callback);
+          return addSanitizedTypeData(req, data.typeSettings, page, type, callback);
         },
         // To be nice we keep the type settings around for other page types the user
         // thought about giving this page. This avoids pain if the user switches and
         // switches back. Alas it means we must keep validating them on save
         sanitizeOtherTypeSettings: function(callback) {
-          return self.sanitizeOtherTypeSettings(req, page, callback);
+          return self.sanitizeOtherTypeSettings(req, data.otherTypeSettings, page, callback);
+        },
+        sanitizeAreas: function(callback) {
+          if (data.areas) {
+            page.areas = {};
+            _.each(data.areas, function(value, key) {
+              var items = self._apos.sanitizeItems(value.items || []);
+              page.areas[key] = { items: items };
+            });
+          }
+          return callback(null);
         },
         putPage: function(callback) {
           return apos.putPage(req, page.slug, page, callback);
         }
-      }, callback);
+      }, function(err) {
+        if (err) {
+          return callback(err);
+        }
+        return callback(null, page);
+      });
     }
 
-    function sendPage(err) {
-      if (err) {
-        res.statusCode = 500;
-        return res.send('error');
-      }
-      return res.send(JSON.stringify(page));
+  };
+
+  /**
+   * Get the correct rank to assign to a newly inserted subpage
+   * (one higher than the rank of any existing page). By default
+   * any pages with ranks greater than or equal to 1000000 are
+   * ignored, so that newly inserted pages do not come
+   * after system pages like the trashcan. However if options.system
+   * is true then the rank returned will be at least 1000000 and
+   * higher than any existing child, including system pages.
+   *
+   * "parent" must be a page object. "options" may
+   * be skipped in favor of just two arguments. "cb" is the callback.
+   * The callback receives an error if any, and if no error,
+   * the rank for the new page.
+   */
+  self.getNextRank = function(parent, options, callback) {
+    if (!callback) {
+      callback = options;
+      options = {};
     }
+    var criteria = {
+      path: new RegExp('^' + RegExp.quote(parent.path + '/'))
+    };
+    if (!options.system) {
+      criteria.rank = { $lt: 1000000 };
+    }
+    return apos.pages.find(criteria, { rank: 1 }).sort({ rank: -1 }).limit(1).toArray(function(err, pages) {
+      if (err) {
+        return callback(err);
+      }
+      if (!pages.length) {
+        return callback(null, options.system ? 1000000 : 1);
+      }
+      return callback(null, pages[0].rank + 1);
+    });
   };
 
   // Implementation of the /edit route which manipulates page settings. Broken out to
@@ -1429,7 +1493,7 @@ function pages(options, callback) {
       page.published = published;
       page.slug = slug;
       page.tags = tags;
-      type = determineType(req, page.type);
+      type = determineType(req.body.type, page.type);
       page.type = type.name;
 
       if ((slug !== originalSlug) && (originalSlug === '/')) {
@@ -1441,13 +1505,13 @@ function pages(options, callback) {
           return self.applyPermissions(req, req.body, page, callback);
         },
         sanitizeTypeSettings: function(callback) {
-          return addSanitizedTypeData(req, page, type, callback);
+          return addSanitizedTypeData(req, req.body.typeSettings, page, type, callback);
         },
         // To be nice we keep the type settings around for other page types this page
         // has formerly had. This avoids pain if the user switches and switches back.
         // Alas it means we must keep validating them on save
         sanitizeOtherTypeSettings: function(callback) {
-          return self.sanitizeOtherTypeSettings(req, page, callback);
+          return self.sanitizeOtherTypeSettings(req, req.body.otherTypeSettings, page, callback);
         },
         putPage: function(callback) {
           return apos.putPage(req, originalSlug, page, callback);
@@ -1478,8 +1542,12 @@ function pages(options, callback) {
     }
   };
 
-  self.sanitizeOtherTypeSettings = function(req, page, callback) {
-    var raw = req.body.otherTypeSettings || {};
+  // data is typically passed from req.body.otherTypeSettings and contains
+  // settings for types other than the one currently in effect, preserved
+  // for easier switches between page types.
+
+  self.sanitizeOtherTypeSettings = function(req, data, page, callback) {
+    var raw = data || {};
     var sanitized = {};
     return async.eachSeries(aposPages.types, function(type, callback) {
       if (raw[type.name] && type.settings.sanitize) {
@@ -1645,11 +1713,10 @@ function pages(options, callback) {
   // For visibility in other scopes
   self.options = options;
 
-  function determineType(req, def) {
+  function determineType(typeName, def) {
     if (def === undefined) {
       def = 'default';
     }
-    var typeName = req.body.type;
     type = self.getType(typeName);
     if (!type) {
       typeName = def;
@@ -1659,11 +1726,11 @@ function pages(options, callback) {
     return type;
   }
 
-  function addSanitizedTypeData(req, page, type, callback) {
+  function addSanitizedTypeData(req, data, page, type, callback) {
     // Allow for sanitization of data submitted for specific page types.
     // If there is no sanitize function assume there is no data for safety
     if (type.settings && type.settings.sanitize) {
-      type.settings.sanitize(req.body.typeSettings || {}, function(err, data) {
+      type.settings.sanitize(data || {}, function(err, data) {
         if (err) {
           return callback(err);
         } else {
