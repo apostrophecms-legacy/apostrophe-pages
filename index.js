@@ -886,7 +886,7 @@ function pages(options, callback) {
     var rank;
     var originalPath;
     var originalSlug;
-    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeOldPeers, nudgeNewPeers, moveSelf, moveDescendants, trashDescendants ], finish);
+    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeNewPeers, moveSelf, moveDescendants, trashDescendants ], finish);
     function getMoved(callback) {
       if (moved) {
         return callback(null);
@@ -982,18 +982,22 @@ function pages(options, callback) {
         apos.permissions(req, 'manage-page', moved, callback);
       });
     }
-    function nudgeOldPeers(callback) {
-      // Nudge up the pages that used to follow us
-      // Leave reserved range alone
-      var oldParentPath = path.dirname(moved.path);
-      apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: moved.rank, $lte: 1000000 }}, { $inc: { rank: -1 } }, function(err, count) {
-        return callback(err);
-      });
-    }
+    // This results in problems if the target is below us, and
+    // it really doesn't matter if there are gaps between ranks. -Tom
+    //
+    // function nudgeOldPeers(callback) {
+    //   // Nudge up the pages that used to follow us
+    //   // Leave reserved range alone
+    //   var oldParentPath = path.dirname(moved.path);
+    //   apos.pages.update({ path: new RegExp('^' + RegExp.quote(oldParentPath + '/')), level: moved.level, rank: { $gte: moved.rank, $lte: 1000000 }}, { $inc: { rank: -1 } }, { multi: true }, function(err, count) {
+    //     return callback(err);
+    //   });
+    // }
     function nudgeNewPeers(callback) {
       // Nudge down the pages that should now follow us
       // Leave reserved range alone
-      apos.pages.update({ path: new RegExp('^' + RegExp.quote(parent.path + '/')), level: parent.level + 1, rank: { $gte: rank, $lte: 1000000 }}, { $inc: { rank: 1 } }, function(err, count) {
+      // Always remember multi: true
+      apos.pages.update({ path: new RegExp('^' + RegExp.quote(parent.path + '/')), level: parent.level + 1, rank: { $gte: rank, $lte: 1000000 } }, { $inc: { rank: 1 } }, { multi: true }, function(err, count) {
         return callback(err);
       });
     }
@@ -2132,6 +2136,7 @@ function pages(options, callback) {
       var position = req.body.position;
       return self.move(req, movedSlug, targetSlug, position, function(err, changed) {
         if (err) {
+          console.error(err);
           res.statusCode = 404;
           return res.send();
         } else {
