@@ -1,15 +1,15 @@
 {% if args.page and args.edit %}
 
 <ul class="apos-admin-bar-item apos-accordion-menu">
-  <li class="apos-accordion-title"><i class="icon-doc"></i>Page</li>
+  <li class="apos-accordion-title"><i class="icon-doc"></i>{{ __('Page') }}</li>
   <li class="apos-accordion-items">
     <ul class="apos-page-bar">
-      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-new-page" data-new-page>New Page</li>
-      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-edit-page" data-edit-page>Page Settings</li>
-      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-versions-page" data-versions-page>Page Versions</li>
-      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-delete-page" data-delete-page>Move to Trash</li>
+      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-new-page" data-new-page>{{ __('New Page') }}</li>
+      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-edit-page" data-edit-page>{{ __('Page Settings') }}</li>
+      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-versions-page" data-versions-page>{{ __('Page Versions') }}</li>
+      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-delete-page" data-delete-page>{{ __('Move to Trash') }}</li>
       {# TODO appearance should be conditional on sitewide admin rights? #}
-      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-reorganize-page" data-reorganize-page>Reorganize</li>
+      <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-reorganize-page" data-reorganize-page>{{ __('Reorganize') }}</li>
     </ul>
   </li>
 </ul>

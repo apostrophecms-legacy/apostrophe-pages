@@ -1,47 +1,47 @@
 {% include 'formMacros.html' %}
 
 <div class="apos-page-settings apos-modal apos-template {% block class %}apos-new-page-settings{% endblock %}">
-  <h3>{% block action %}New Page{% endblock %}</h3>
+  <h3>{% block action %}{{ __('New Page') }}{% endblock %}</h3>
   <div class="apos-modal-body">
     <form>
-      {{ formText('title', 'Title') }}
+      {{ formText('title', __('Title')) }}
       {# JS will populate it #}
-      {{ formSelect('type', 'Type', []) }}
-      {{ formBoolean('published', 'Published') }}
-      {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
+      {{ formSelect('type', __('Type'), []) }}
+      {{ formBoolean('published', __('Published')) }}
+      {{ formText('seoDescription', __('SEO Description'), { limit: 155 }) }}
 
       {# PERMISSIONS #}
       {# Toggles open apos-view-permissions #}
       <div class="apos-page-settings-toggle">
-        <a data-show-view-permissions href="#">Who can see this?</a>
+        <a data-show-view-permissions href="#">{{ __('Who can see this?') }}</a>
         <div class="apos-view-permissions apos-page-settings-toggle-content">
           <fieldset class="apos-fieldset apos-fieldset-select apos-fieldset-login-required" data-name="{{ loginRequired }}">
-            <label>Permitted</label>
+            <label>{{ __('Permitted') }}</label>
             {{ formSelectStandalone('loginRequired',
                 [
                   {
                     value: '',
-                    label: 'Public'
+                    label: __('Public')
                   },
                   {
                     value: 'loginRequired',
-                    label: 'Login Required'
+                    label: __('Login Required')
                   },
                   {
                     value: 'certainPeople',
-                    label: 'Certain People'
+                    label: __('Certain People')
                   }
                 ]
               )
             }}
-            <span class="apos-propagate"><input type="checkbox" name="loginRequiredPropagate" /> Apply to Subpages</span>
+            <span class="apos-propagate"><input type="checkbox" name="loginRequiredPropagate" /> {{ __('Apply to Subpages') }}</span>
           </fieldset>
           {# js shows this class when "Certain People" is chosen #}
           <div class="apos-view-certain-people">
-            {{ formSelective('viewGroupIds', 'Groups', { propagate: true }) }}
-            {{ formSelective('viewPersonIds', 'Individuals', { propagate: true }) }}
+            {{ formSelective('viewGroupIds', __('Groups'), { propagate: true }) }}
+            {{ formSelective('viewPersonIds', __('Individuals'), { propagate: true }) }}
           </div>
-          <p class="apos-view-permissions-hint">Admins can always see everything.</p>
+          <p class="apos-view-permissions-hint">{{ __('Admins can always see everything.') }}</p>
         </div>
       </div>
 
@@ -50,12 +50,12 @@
       <div data-edit-permissions-container>
         {# Toggles open apos-edit-permissions #}
         <div class="apos-page-settings-toggle">
-          <a data-show-edit-permissions href="#">Who can edit this?</a>
+          <a data-show-edit-permissions href="#">{{ __('Who can edit this?') }}</a>
           <div class="apos-edit-permissions apos-page-settings-toggle-content">
-            {{ formSelective('editGroupIds', 'Groups', { propagate: true }) }}
-            {{ formSelective('editPersonIds', 'Individuals', { propagate: true }) }}
+            {{ formSelective('editGroupIds', __('Groups'), { propagate: true }) }}
+            {{ formSelective('editPersonIds', __('Individuals'), { propagate: true }) }}
             {# This won't be true for some site somewhere, give it a class #}
-            <p class="apos-edit-permissions-hint">Admins can always edit everything.</p>
+            <p class="apos-edit-permissions-hint">{{ __('Admins can always edit everything.') }}</p>
           </div>
         </div>
 
@@ -66,13 +66,13 @@
       {# but provide a block the edit template can override #}
       {% block slug %}
       {% endblock %}
-      {{ formTags('tags', 'Tags') }}
+      {{ formTags('tags', __('Tags')) }}
       {# js populates this as needed, for instance blog pages have extra settings #}
       <div data-type-details></div>
     </form>
   </div>
   <div class="apos-modal-footer">
-    <a href="#" data-action="save" class="apos-control apos-button apos-save">Save</a>
-    <a href="#" data-action="dismiss" class="apos-control apos-button apos-cancel">Cancel</a>
+    <a href="#" data-action="save" class="apos-control apos-button apos-save">{{ __('Save') }}</a>
+    <a href="#" data-action="dismiss" class="apos-control apos-button apos-cancel">{{ __('Cancel') }}</a>
   </div>
 </div>
