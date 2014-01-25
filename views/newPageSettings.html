@@ -4,11 +4,11 @@
   <h3>{% block action %}{{ __('New Page') }}{% endblock %}</h3>
   <div class="apos-modal-body">
     <form>
-      {{ formText('title', __('Title')) }}
+      {{ formText('title', 'Title') }}
       {# JS will populate it #}
-      {{ formSelect('type', __('Type'), []) }}
-      {{ formBoolean('published', __('Published')) }}
-      {{ formText('seoDescription', __('SEO Description'), { limit: 155 }) }}
+      {{ formSelect('type', 'Type', []) }}
+      {{ formBoolean('published', 'Published') }}
+      {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
 
       {# PERMISSIONS #}
       {# Toggles open apos-view-permissions #}
@@ -21,15 +21,15 @@
                 [
                   {
                     value: '',
-                    label: __('Public')
+                    label: 'Public'
                   },
                   {
                     value: 'loginRequired',
-                    label: __('Login Required')
+                    label: 'Login Required'
                   },
                   {
                     value: 'certainPeople',
-                    label: __('Certain People')
+                    label: 'Certain People'
                   }
                 ]
               )
@@ -38,8 +38,8 @@
           </fieldset>
           {# js shows this class when "Certain People" is chosen #}
           <div class="apos-view-certain-people">
-            {{ formSelective('viewGroupIds', __('Groups'), { propagate: true }) }}
-            {{ formSelective('viewPersonIds', __('Individuals'), { propagate: true }) }}
+            {{ formSelective('viewGroupIds', 'Groups', { propagate: true }) }}
+            {{ formSelective('viewPersonIds', 'Individuals', { propagate: true }) }}
           </div>
           <p class="apos-view-permissions-hint">{{ __('Admins can always see everything.') }}</p>
         </div>
@@ -52,8 +52,8 @@
         <div class="apos-page-settings-toggle">
           <a data-show-edit-permissions href="#">{{ __('Who can edit this?') }}</a>
           <div class="apos-edit-permissions apos-page-settings-toggle-content">
-            {{ formSelective('editGroupIds', __('Groups'), { propagate: true }) }}
-            {{ formSelective('editPersonIds', __('Individuals'), { propagate: true }) }}
+            {{ formSelective('editGroupIds', 'Groups', { propagate: true }) }}
+            {{ formSelective('editPersonIds', 'Individuals', { propagate: true }) }}
             {# This won't be true for some site somewhere, give it a class #}
             <p class="apos-edit-permissions-hint">{{ __('Admins can always edit everything.') }}</p>
           </div>
@@ -66,7 +66,7 @@
       {# but provide a block the edit template can override #}
       {% block slug %}
       {% endblock %}
-      {{ formTags('tags', __('Tags')) }}
+      {{ formTags('tags', 'Tags') }}
       {# js populates this as needed, for instance blog pages have extra settings #}
       <div data-type-details></div>
     </form>
