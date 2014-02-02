@@ -4,6 +4,10 @@
 
 `apostrophe-pages` also provides a UI for adding pages, deleting pages and changing page settings such as the title. As part of that, `apostrophe-pages` provides functions to fetch ancestor and descendant pages to any desired depth.
 
+### Code Stability
+
+0.4.x releases receive bug fixes only. For active development, follow 0.5.x releases and/or the master branch in github.
+
 ## Serving Pages
 
 By default `apostrophe-pages` renders page templates found in its `views` folder depending on the `template` property of the page. You can override the location where one or all of these are found in order to provide custom templates for your project's needs.
