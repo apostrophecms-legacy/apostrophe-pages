@@ -2,7 +2,6 @@ var async = require('async');
 var _ = require('underscore');
 var extend = require('extend');
 var path = require('path');
-var ent = require('ent');
 
 RegExp.quote = require('regexp-quote');
 
@@ -440,57 +439,18 @@ function pages(options, callback) {
               // we know about every event in every widget etc., which
               // is redundant and results in slow page loads and
               // high bandwidth usage
-              page: self.prunePage(req.bestPage)
+              page: apos.prunePage(req.bestPage)
             }
           });
         }
 
-        req.pushData({
-          permissions: (req.user && req.user.permissions) || {}
-        });
-
-        var when = req.user ? 'user' : 'anon';
-        var calls = apos.getGlobalCallsWhen('always');
-        if (when === 'user') {
-          calls = calls + apos.getGlobalCallsWhen('user');
-        }
-        calls = calls + apos.getCalls(req);
-        // Always the last call; signifies we're done initializing the
-        // page as far as the core is concerned; a lovely time for other
-        // modules and project-level javascript to do their own
-        // enhancements. The content area refresh mechanism also
-        // triggers this event
-        calls += '\n$("body").trigger("aposReady");\n';
-
-        // JavaScript may want to know who the user is. Prune away
-        // big stuff like their profile areas
-        if (req.user) {
-          // This should be gone already but let's be doubly sure!
-          delete req.user.password;
-          req.pushData({ user: self.prunePage(req.user) });
-        }
-
         var args = {
           edit: req.edit,
-          // Make sure we pass the slug of the page, not the
-          // complete URL. Frontend devs are expecting to be able
-          // to use this slug to attach URLs to a page
           slug: providePage ? req.bestPage.slug : null,
-          page: providePage ? req.bestPage : null,
-          user: req.user,
-          permissions: (req.user && req.user.permissions) || {},
-          when: req.user ? 'user' : 'anon',
-          calls: calls,
-          data: apos.getGlobalData() + apos.getData(req),
-          refreshing: !!req.query.apos_refresh,
-          // Make the query available to templates for easy access to
-          // filter settings etc.
-          query: req.query
+          page: providePage ? req.bestPage : null
         };
 
-        _.defaults(args, req.extras);
-
-        var content;
+        _.extend(args, req.extras);
 
         // A simple way to access everything we know about the page
         // in JSON format. Allow this only if we have editing privileges
@@ -499,8 +459,10 @@ function pages(options, callback) {
           return res.send(args.page);
         }
 
+        var path;
+
         if (typeof(req.template) === 'string') {
-          var path = __dirname + '/views/' + req.template;
+          path = __dirname + '/views/' + req.template;
           if (options.templatePath) {
             path = options.templatePath + '/' + req.template;
           }
@@ -509,111 +471,11 @@ function pages(options, callback) {
               path = options.templatePaths[type] + '/' + req.template;
             }
           }
-          content = apos.partial(path, args);
-        } else {
-          // A custom loader gave us a function to render with.
-          // Give it access to the same arguments, and also to the request
-          // object which is helpful in unusual cases like RSS feed generation
-          content = req.template(args, req);
         }
 
-        args.content = content;
-        args.safeMode = (req.query.safe_mode !== undefined);
-        // AJAX requests never get an outer layout. Also allow
-        // for a query parameter that fakes xhr and a flag to
-        // explicitly shut off decoration, which is useful if
-        // the template is rendering an alternative format
-        // such as RSS
-        if (req.xhr || req.query.xhr || (req.decorate === false)) {
-          return send(content);
-        } else {
-          return send(self.decoratePageContent(args));
-        }
-      }
-
-      function send(data) {
-        // console.log(now() - start);
-        return res.send(data);
+        return res.send(self.renderPage(req, path ? path : req.template, args));
       }
     };
-  };
-
-  // We send the current page's metadata as inline JSON that winds up in
-  // apos.data.aposPages.page in the browser. It's very helpful for building
-  // page manipulation UI. But we shouldn't redundantly send the areas, as we are already
-  // rendering the ones we care about. And we shouldn't send our relatives
-  // as we're already rendering those as navigation if we want them. Also
-  // prune out the search text which can contain characters that are valid
-  // JSON but not valid JS (the existence of this is a nightmare):
-  // https://code.google.com/p/v8/issues/detail?id=1907
-
-  self.prunePage = function(page) {
-    return _.omit(page, 'areas', 'tabs', 'ancestors', 'children', 'peers', 'lowSearchText', 'highSearchText', 'searchSummary');
-  };
-
-  // Decorate the contents of args.content as a complete webpage. If args.refreshing is
-  // true, return just that content, as we're performing an AJAX refresh of the main
-  // content area. If args.refreshing is not true, return it as a completely
-  // new page (CSS, JS, head, body...) wrapped in the outerLayout template. This is
-  // made available to allow developers to render other content the same way
-  // Apostrophe pages are rendered. For instance, it's useful for a local
-  // login page template, a site reorganization screen or anything else that
-  // is a poor fit for a page template or a javascript modal.
-  //
-  // This may go away when nunjucks gets conditional extends.
-  //
-  // As a workaround to allow you to set the body class, use a comment like this
-  // inside args.content:
-  //
-  // <!-- APOS-BODY-CLASS class names here -->
-
-  self.decoratePageContent = function(args) {
-    // On an AJAX refresh of the main content area only, just send the
-    // main content area. The rest of the time, render the outerLayout and
-    // pass the main content to it
-    if (args.refreshing) {
-      return args.content;
-    } else {
-      // This is a bit of a nasty workaround: we need to communicate a few things
-      // to the outer layout, and since it must run as a separate invocation of
-      // nunjucks there's no great way to get them there.
-
-      // [\s\S] is like . but matches newlines too. Great workaround for the lack
-      // of a /s modifier in JavaScript
-      // http://stackoverflow.com/questions/1068280/javascript-regex-multiline-flag-doesnt-work
-
-      var match = args.content.match(/<\!\-\- APOS\-BODY\-CLASS ([\s\S]*?) \-\-\>/);
-      if (match) {
-        args.bodyClass = match[1];
-      }
-      match = args.content.match(/<\!\-\- APOS\-TITLE ([\s\S]*?) \-\-\>/);
-      if (match) {
-        args.title = match[1];
-      }
-      match = args.content.match(/<\!\-\- APOS\-EXTRA\-HEAD ([\s\S]*?) \-\-\>/);
-      if (match) {
-        args.extraHead = match[1];
-      }
-      match = args.content.match(/<\!\-\- APOS\-SEO\-DESCRIPTION ([\s\S]*?) \-\-\>/);
-      if (match) {
-        args.seoDescription = match[1];
-      }
-
-      // Allow raw HTML slots on a true page update, without the risk
-      // of document.write blowing up a page during a partial update.
-      // This is pretty nasty too, keep thinking about alternatives.
-      if (!args.safeMode) {
-        args.content = args.content.replace(/<\!\-\- APOS\-RAW\-HTML\-BEFORE \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-START \-\-\>([\s\S]*?)<\!\-\- APOS\-RAW\-HTML\-END \-\-\>[\s\S]*?<\!\-\- APOS\-RAW\-HTML\-AFTER \-\-\>/g, function(all, code) {
-        return ent.decode(code);
-        });
-      }
-
-      if (typeof(options.outerLayout) === 'function') {
-        return options.outerLayout(args);
-      } else {
-        return apos.partial(options.outerLayout || 'outerLayout', args);
-      }
-    }
   };
 
   // Fetch ancestors of the specified page. We need req to
@@ -1698,6 +1560,7 @@ function pages(options, callback) {
   };
 
   if (options.ui) {
+
     apos.pushGlobalData({
       aposPages: {
         root: options.root || '/',
@@ -1747,20 +1610,8 @@ function pages(options, callback) {
     }
   }
 
-  // Make sure that aposScripts and aposStylesheets summon our
-  // browser-side UI assets for managing pages
-
   if (options.ui) {
-    self.pushAsset = function(type, name, options) {
-      // TODO should probably support a chain of subclasses like
-      // the snippet modules do
-      if (!options) {
-        options = {};
-      }
-      options.fs = __dirname;
-      options.web = self._action + '';
-      return apos.pushAsset(type, name, options);
-    };
+    apos.mixinModuleAssets(self, 'apostrophe-pages', __dirname, options);
 
     self.pushAsset('script', 'jqtree', { when: 'user' });
     self.pushAsset('stylesheet', 'jqtree', { when: 'user' });
@@ -2049,7 +1900,7 @@ function pages(options, callback) {
           res.statusCode = 404;
           return res.send();
         } else {
-          return res.send(apos.partial('versions', { versions: versions }));
+          return res.send(self.render('versions', { versions: versions }));
         }
       }
 
@@ -2285,7 +2136,7 @@ function pages(options, callback) {
 
     apos.addLocal('aposPagesMenu', function(options) {
       // Pass the options as one argument so they can be passed on
-      return apos.partial('pagesMenu', { args: options }, __dirname + '/views');
+      return self.render('pagesMenu', { args: options }, __dirname + '/views');
     });
 
     apos.on('tasks:register', function(taskGroups) {
@@ -2367,6 +2218,8 @@ function pages(options, callback) {
         }
       };
     });
+    // After all of our routes
+    self.serveAssets();
   }
 
   async.series([ pathIndex ], callback);
