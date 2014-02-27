@@ -2017,6 +2017,31 @@ function pages(options, callback) {
       if (req.page.type !== 'search') {
         return callback(null);
       }
+
+      // Build search filters by type. The default filter offers
+      // "Page" and all of the snippet instance types that are searchable.
+      // Anything that isn't one of the latter is toggled by "Page"
+      var searchFilters = [
+        { name: 'page', label: 'Pages' }
+      ];
+      var instanceTypesSeen = {};
+      _.each(self.types, function(type) {
+        if (type._instance && (type.searchable !== false)) {
+          if (!instanceTypesSeen[type._instance]) {
+            searchFilters.push({
+              name: type._instance,
+              label: type.pluralLabel
+            });
+          }
+        }
+      });
+      console.log(searchFilters);
+      // Option to override or shut off with false
+      if (options.searchFilters !== undefined) {
+        searchFilters = options.searchFilters;
+      }
+      req.extras.searchFilters = searchFilters;
+
       var q = req.query.q;
       req.extras.q = q;
       // Turn it into a regular expression
