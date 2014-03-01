@@ -96,7 +96,6 @@ function AposPages() {
     // Shared state closure for the page settings dialogs (new and edit)
     (function() {
       var oldTypeName;
-      var otherTypeSettings = {};
       // Active dialog
       var $el;
 
@@ -172,14 +171,6 @@ function AposPages() {
               $seoDescription.val(apos.data.aposPages.page.seoDescription || '');
               $el.find('[name=slug]').val(slug);
               apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
-
-              // Persistence for settings made when the page had a different type.
-              // Makes Apostrophe forgiving of otherwise serious mistakes, like
-              // adding 20 hand-curated choices in custom page settings for a type,
-              // switching to another type, saving, and then changing your mind
-              if (apos.data.aposPages.page.otherTypeSettings) {
-                otherTypeSettings = apos.data.aposPages.page.otherTypeSettings;
-              }
 
               refreshType();
 
@@ -263,47 +254,35 @@ function AposPages() {
 
         var typeName = $el.find('[name=type]').val();
         if (oldTypeName) {
-          var oldType = aposPages.getType(oldTypeName);
-          if (oldType.settings) {
-            var $details = $el.find('[data-type-details]');
-            // Don't bomb if the dialog was dismissed and the old type's settings aren't
-            // present right now
-            if ($details.length) {
-              if (oldType.settings.serialize.length === 2) {
-                otherTypeSettings[oldTypeName] = oldType.settings.serialize($el, $details);
-              } else {
-                oldType.settings.serialize($el, $details, function(err, info) {
-                  otherTypeSettings[oldTypeName] = info;
-                });
-              }
-            }
-          }
           $el.find('[data-type-details]').html('');
         }
-        oldTypeName = typeName;
 
         var type = aposPages.getType(typeName);
-
         if (type.settings) {
           var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._typeCss);
           $el.find('[data-type-details]').html($typeEl);
-          var typeDefaults = otherTypeSettings[typeName];
-          if (!typeDefaults) {
-            if (apos.data.aposPages.page.type === type.name) {
-              typeDefaults = apos.data.aposPages.page.typeSettings;
-            }
+          var typeDefaults = apos.data.aposPages.page;
+          var unserialize = type.settings.unserialize;
+
+          // Tolerate unserialize methods without a callback.
+          // TODO I'd like to kill that off, but let's break one thing
+          // a day tops if we can.
+          if (unserialize.length === 3) {
+            var superUnserialize = unserialize;
+            unserialize = function(data, $el, $details, callback) {
+              superUnserialize(data, $el, $details);
+              return callback(null);
+            };
           }
-          if (!typeDefaults) {
-            typeDefaults = {};
-          }
-          type.settings.unserialize(typeDefaults, $el, $el.find('[data-type-details]'), function(err) {
-            // NOTE: not all unserialize implementations invoke a callback yet.
-            // .length should be checked.
-            //
+
+          unserialize(typeDefaults, $el, $typeEl, function(err) {
+            apos.emit('enhance', $typeEl);
             // TODO: refreshType should take a callback of its own but
             // for now there is nothing to invoke and nothing that absolutely
             // depends on running after it
           });
+        } else {
+          $el.find('[data-type-details]').html('');
         }
       }
 
@@ -317,8 +296,7 @@ function AposPages() {
           seoDescription: $el.find('[name=seoDescription]').val(),
           type: $el.find('[name=type]').val(),
           published: $el.find('[name=published]').val(),
-          tags: $el.find('[data-name="tags"]').selective('get'),
-          otherTypeSettings: otherTypeSettings
+          tags: $el.find('[data-name="tags"]').selective('get')
         };
 
         // Permissions are fancy! But the server does most of the hard work
@@ -336,17 +314,26 @@ function AposPages() {
           if (!(type && type.settings && type.settings.serialize)) {
             return save();
           }
-          if (type.settings.serialize.length === 2) {
-            data.typeSettings = type.settings.serialize($el, $el.find('[data-type-details]'));
-            return save();
+
+          // Tolerate serialize methods without a callback.
+          // TODO I'd like to kill that off, but let's break one thing
+          // a day tops if we can.
+
+          var serialize = type.settings.serialize;
+          if (serialize.length === 2) {
+            var superSerialize = serialize;
+            serialize = function($el, $details, callback) {
+              var ok = superSerialize($el, $details);
+              return callback(null, ok);
+            };
           }
-          // Newfangled serializer takes a callback
-          return type.settings.serialize($el, $el.find('[data-type-details]'), function(err, typeSettings) {
+
+          return serialize($el, $el.find('[data-type-details]'), function(err, result) {
             if (err) {
               // Block
               return;
             }
-            data.typeSettings = typeSettings;
+            $.extend(true, data, result);
             return save();
           });
         }
