@@ -1152,13 +1152,21 @@ function pages(options, callback) {
   };
 
   // Insert a page. The req argument is examined for permissions purposes.
+  //
   // The data argument is consulted for title, parent (slug of parent page),
-  // published, tags, type, seoDescription, typeSettings and otherTypeSettings,
-  // and is validated, so that you may safely pass it in directly from the browser
-  // (req.body), but this method may also be called to add pages for other reasons.
-  // If data.areas is passed then content areas may be inserted directly at
-  // insert time; this is useful during import operations. Areas are also
-  // sanitized. The new page is the last child of its parent.
+  // published, tags, type, seoDescription, viewGroupIds, editGroupIds,
+  // viewPersonIds and editGroupIds fields, which are validated here.
+  //
+  // All other fields are validated via the sanitizer for
+  // the current page type, except that fields with the "type: area" property
+  // may always be introduced as long as they do not override existing properties
+  // that area not areas. This allows the introduction of areas in page templates
+  // without the need for changes in app.js. Such spontaneous areas are still
+  // sanitized as areas.
+  //
+  // You may safely pass in a page object from the browser (req.body), but this
+  // method may also be called to add pages for other reasons. The new page is
+  // the last child of its parent.
 
   self.insertPage = function(req, data, callback) {
     var parent;
@@ -1239,23 +1247,11 @@ function pages(options, callback) {
         applyPermissions: function(callback) {
           return self.applyPermissions(req, data, page, callback);
         },
-        sanitizeTypeSettings: function(callback) {
-          return addSanitizedTypeData(req, data.typeSettings, page, type, callback);
+        sanitizeTypeData: function(callback) {
+          return addSanitizedTypeData(req, data, page, type, callback);
         },
-        // To be nice we keep the type settings around for other page types the user
-        // thought about giving this page. This avoids pain if the user switches and
-        // switches back. Alas it means we must keep validating them on save
-        sanitizeOtherTypeSettings: function(callback) {
-          return self.sanitizeOtherTypeSettings(req, data.otherTypeSettings, page, callback);
-        },
-        sanitizeAreas: function(callback) {
-          if (data.areas) {
-            page.areas = {};
-            _.each(data.areas, function(value, key) {
-              var items = self._apos.sanitizeItems(value.items || []);
-              page.areas[key] = { items: items };
-            });
-          }
+        sanitizeSpontaneousAreas: function(callback) {
+          sanitizeSpontaneousAreas(data, page);
           return callback(null);
         },
         putPage: function(callback) {
@@ -1308,7 +1304,9 @@ function pages(options, callback) {
   };
 
   // Implementation of the /edit route which manipulates page settings. Broken out to
-  // a method for easier unit testing
+  // a method for easier unit testing. See insertPage for a discussion of core
+  // properties, type-specific properties, and spontaneous area properties
+
   self._editRoute = function(req, res) {
 
     var page;
@@ -1389,14 +1387,12 @@ function pages(options, callback) {
         applyPermissions: function(callback) {
           return self.applyPermissions(req, req.body, page, callback);
         },
-        sanitizeTypeSettings: function(callback) {
-          return addSanitizedTypeData(req, req.body.typeSettings, page, type, callback);
+        sanitizeTypeData: function(callback) {
+          return addSanitizedTypeData(req, req.body, page, type, callback);
         },
-        // To be nice we keep the type settings around for other page types this page
-        // has formerly had. This avoids pain if the user switches and switches back.
-        // Alas it means we must keep validating them on save
-        sanitizeOtherTypeSettings: function(callback) {
-          return self.sanitizeOtherTypeSettings(req, req.body.otherTypeSettings, page, callback);
+        sanitizeSpontaneousAreas: function(callback) {
+          sanitizeSpontaneousAreas(req.body, page);
+          return callback(null);
         },
         putPage: function(callback) {
           return apos.putPage(req, originalSlug, page, callback);
@@ -1427,34 +1423,25 @@ function pages(options, callback) {
     }
   };
 
-  // data is typically passed from req.body.otherTypeSettings and contains
-  // settings for types other than the one currently in effect, preserved
-  // for easier switches between page types.
+  // Both the new and edit page operations utilize this to deal with areas
+  // that arise spontaneously via page templates rather than being hardcoded
+  // in the schema. The rule is that if an otherwise unknown property is an
+  // object with a "type" sub-property set to "area", that is accepted and
+  // sanitized as an area.
 
-  self.sanitizeOtherTypeSettings = function(req, data, page, callback) {
-    var raw = data || {};
-    var sanitized = {};
-    return async.eachSeries(aposPages.types, function(type, callback) {
-      if (raw[type.name] && type.settings.sanitize) {
-        return type.settings.sanitize(raw[type.name] || {}, function(err, data) {
-          if (err) {
-            // Bad page settings for types not currently in effect are not a crisis
-            return callback(null);
+  function sanitizeSpontaneousAreas(data, page) {
+    _.each(data, function(val, key) {
+      if (typeof(val) === 'object') {
+        if (val.type === 'area') {
+          if (_.has(page, key) && ((typeof(val) !== 'object') || (val.type !== 'area'))) {
+            // Spontaneous areas may not replace properties that are not areas
+            return;
           }
-          sanitized[type.name] = data;
-          return callback(null);
-        });
-      } else {
-        return callback(null);
+          page[key] = { type: 'area', items: self._apos.sanitizeItems(val.items || []) };
+        }
       }
-    }, function(err) {
-      if (err) {
-        return callback(err);
-      }
-      page.otherTypeSettings = sanitized;
-      return callback(null);
     });
-  };
+  }
 
   // Given a request object for a user with suitable permissions and a data object
   // with loginRequired, loginRequiredPropagate, viewGroupIds, viewPersonIds,
@@ -1620,7 +1607,7 @@ function pages(options, callback) {
         if (err) {
           return callback(err);
         } else {
-          page.typeSettings = data;
+          extend(true, page, data);
           return callback(null);
         }
       });
@@ -2036,6 +2023,30 @@ function pages(options, callback) {
       if (req.page.type !== 'search') {
         return callback(null);
       }
+
+      // Build search filters by type. The default filter offers
+      // "Page" and all of the snippet instance types that are searchable.
+      // Anything that isn't one of the latter is toggled by "Page"
+      var searchFilters = [
+        { name: 'page', label: 'Pages' }
+      ];
+      var instanceTypesSeen = {};
+      _.each(self.types, function(type) {
+        if (type._instance && (type.searchable !== false)) {
+          if (!instanceTypesSeen[type._instance]) {
+            searchFilters.push({
+              name: type._instance,
+              label: type.pluralLabel
+            });
+          }
+        }
+      });
+      // Option to override or shut off with false
+      if (options.searchFilters !== undefined) {
+        searchFilters = options.searchFilters;
+      }
+      req.extras.searchFilters = searchFilters;
+
       var q = req.query.q;
       req.extras.q = q;
       // Turn it into a regular expression

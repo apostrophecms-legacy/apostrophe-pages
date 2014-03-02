@@ -188,3 +188,27 @@ This helper function inserts the page-related buttons at that point and also the
 ## Automatic Redirects ##
 
 If you change the slug (URL) of a page via the Page Settings button, that doesn't tell Google and other search engines that the page has moved. So as a convenience, `apostrophe-pages` automatically tracks the old URLs and provides redirects to the new URLs. Of course, if a new page is created at the old URL, that page wins and the old redirect is not used.
+
+## Search
+
+The `apostrophe-search` module also provides a sitewide search facility. This is implemented by a page loader function that kicks in for pages (usually just one) with the `search` type.
+
+Simple filters are provided to include or exclude results. There is a checkbox for each searchable instance type (such as `blogPost` or `event`) and for regular pages. You can override these with the `searchLoader` option to the pages module. For instance, in `app.js` in a project using `apostrophe-site` for configuration:
+
+```javascript
+pages: {
+  searchLoader: [
+    {
+      name: 'page',
+      label: 'Pages'
+    },
+    {
+      name: 'blogPost',
+      label: 'Blog Posts'
+    }
+  ]
+}
+```
+
+Any searchable document whose page type does not have a specific filter is toggled by the `page` filter. *If you do not include a filter with the name `page` then such documents will not be visible in search results.* However this is frontend filtering and should not be relied upon to secure information by keeping it out of search. For that, if you are subclassing snippets, you may use the `searchable` option when configuring the module.
+
