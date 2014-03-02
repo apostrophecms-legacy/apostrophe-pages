@@ -223,7 +223,8 @@ function AposPages() {
         $type.html('');
         _.each(apos.data.aposPages.menu || apos.data.aposPages.types, function(type) {
           var $option = $('<option></option>');
-          $option.text(type.label);
+          // The label is wrapped in i18n
+          $option.text( __(type.label) );
           $option.attr('value', type.name);
           // If we've passed in the presetType, let's select that one.
           if (type.name === presetType) {

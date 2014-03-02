@@ -2,7 +2,7 @@
 {% extends 'newPageSettings.html' %}
 
 {% block class %}apos-edit-page-settings{% endblock %}
-{% block action %}Edit Page{% endblock %}
+{% block action %}{{ __('Edit Page') }}{% endblock %}
 {% block slug %}
   {{ formText('slug', 'Slug') }}
 {% endblock %}
