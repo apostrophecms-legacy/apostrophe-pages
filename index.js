@@ -105,14 +105,13 @@ function pages(options, callback) {
   // // Just create an empty page object like a wiki would
   // app.get('*', pages.serve({
   //   notfound: function(req, callback) {
-  //     req.page = { areas: {} };
+  //     req.page = { };
   //     callback(null);
   //   }
   // });
   //
   // If you do not set req.page the normal page-not-found behavior is applied.
-  // Make sure you specify at least an areas property. If you do not supply a
-  // type property, 'default' is assumed.
+  // If you do not supply a type property, 'default' is assumed.
   //
   // A JSON interface is also built in for each page: if you add
   // ?pageInformation=json to the URL, a JSON description of the page
@@ -326,11 +325,9 @@ function pages(options, callback) {
                 if (err) {
                   return callback(err);
                 }
-                // Provide an object with an empty areas property if
-                // the page doesn't exist yet. This simplifies page type templates
                 // The new syntax for aposArea() requires a more convincing fake page!
                 // Populate slug and permissions correctly
-                req.extras[item] = page ? page : { slug: item, areas: [] };
+                req.extras[item] = page ? page : { slug: item };
                 if (!page) {
                   apos.addPermissionsToPages(req, [req.extras[item]]);
                 }
@@ -539,7 +536,11 @@ function pages(options, callback) {
     if (options.areas) {
       getOptions.areas = options.areas;
     } else {
-      getOptions.fields.areas = 0;
+      // We can't populate the fields option because we can't know the names
+      // of all the area properties in the world in order to exclude them.
+      // Use the `areas` option which filters them after fetching so we at least
+      // don't pay to run their loaders
+      getOptions.areas = false;
     }
 
     if (options.getOptions) {
@@ -644,9 +645,10 @@ function pages(options, callback) {
     if (!options.areas) {
       // Don't fetch areas at all unless we're interested in a specific
       // subset of them
-      options.fields.areas = 0;
+      options.areas = false;
     }
     options.sort = { level: 1, rank: 1 };
+
     apos.get(req, criteria, options, function(err, results) {
       if (err) {
         return callback(err);
@@ -695,14 +697,11 @@ function pages(options, callback) {
       callback = options;
       options = {};
     }
-    var projection;
-    if (options.areas) {
-      projection = {};
-    } else {
-      projection = { areas: 0 };
+    if (!options.areas) {
+      options.areas = false;
     }
     var criteria = { path: { $exists: 1 }, tags: { $in: tags }};
-    return apos.get(req, criteria, {}, function(err, results) {
+    return apos.get(req, criteria, options, function(err, results) {
       if (err) {
         return callback(err);
       }
@@ -1141,7 +1140,7 @@ function pages(options, callback) {
   // All other fields are validated via the sanitizer for
   // the current page type, except that fields with the "type: area" property
   // may always be introduced as long as they do not override existing properties
-  // that area not areas. This allows the introduction of areas in page templates
+  // that are not areas. This allows the introduction of areas in page templates
   // without the need for changes in app.js. Such spontaneous areas are still
   // sanitized as areas.
   //
@@ -1213,7 +1212,7 @@ function pages(options, callback) {
     }
 
     function insertPage(callback) {
-      page = { title: title, seoDescription: seoDescription, published: published, tags: tags, type: type.name, level: parent.level + 1, areas: {}, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+      page = { title: title, seoDescription: seoDescription, published: published, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
 
       // Permissions initially match those of the parent
       page.viewGroupIds = parent.viewGroupIds;
@@ -1588,7 +1587,10 @@ function pages(options, callback) {
         if (err) {
           return callback(err);
         } else {
-          extend(true, page, data);
+          // This is not a deep merge operation, we want to replace
+          // top level properties and we don't want to append to arrays.
+          // So _.extend is the right choice, not the jQuery-style extend module
+          _.extend(page, data);
           return callback(null);
         }
       });
@@ -1947,8 +1949,10 @@ function pages(options, callback) {
         _.each(self.revertListeners, function(listener) {
           listener(version);
         });
-        // Now we can merge the version back onto the page, reverting it
-        extend(true, page, version);
+        // Now we can merge the version back onto the page, reverting it.
+        // We don't want a deep merge or appending of arrays, we want simple
+        // replacement of top level properties.
+        _.extend(page, version);
         // Use apos.putPage so that a new version with a new diff is saved
         return apos.putPage(req, page.slug, page, callback);
       }

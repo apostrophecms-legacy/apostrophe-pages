@@ -39,8 +39,8 @@ You can also add types later, for instance when initializing other modules such 
 
 Your page templates will want to render areas. Just use the page objects passed to you to access them and call the aposArea helper available in anything rendered via apos.partial, which includes page templates:
 
-    {{ aposArea({ slug: slug + ':main', area: page.areas.main, edit: edit }) }}
-    {{ aposArea({ slug: slug + ':main', area: global.areas.footer, edit: edit }) }}
+    {{ aposArea(page, 'main') }}
+    {{ aposArea(global, 'footer') }}
 
 ## Building Navigation: Ancestors and Descendants
 
@@ -137,7 +137,7 @@ Again, `filterByTags` returns pages with *at least one* of the specified tags.
 
 Most sites require that some extra data be loaded along with pages. The data to be loaded is often dependent on the site structure and the unique needs of the project. The pages.serve function supports this via the load option.
 
-The load option accepts an array made up of page slugs and functions. Any strings found in this array are assumed to be the slugs of pages, usually "virtual pages" whose slugs do not start with a leading / and are not directly reachable by navigating the site. Such pages are loaded and added to the `req.extras` property. All properties of `req.extras` are then made available to your page templates. So if you use the virtual page `global` to hold a shared global footer area, you can access it as `global.areas.footer` in your page templates.
+The load option accepts an array made up of page slugs and functions. Any strings found in this array are assumed to be the slugs of pages, usually "virtual pages" whose slugs do not start with a leading / and are not directly reachable by navigating the site. Such pages are loaded and added to the `req.extras` property. All properties of `req.extras` are then made available to your page templates. So if you use the virtual page `global` to hold a shared global footer area, you can access it as `global.footer` in your page templates.
 
 In addition, loaders can be asynchronous functions that modify the `req` object in their own ways. Loaders receive the `req` object as their first parameter and a callback to be invoked on completion as their second parameter. The `req` object will have a `page` property containing the page that matched the slug, if any, and a `remainder` property matching additional content in the URL after the slug if the page is greedy, as explained below.
 
