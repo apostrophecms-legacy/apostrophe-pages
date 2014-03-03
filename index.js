@@ -491,7 +491,7 @@ function pages(options, callback) {
           }
         }
 
-        return res.send(self.renderPage(req, res, path ? path : req.template, args));
+        return res.send(self.renderPage(req, path ? path : req.template, args));
       }
     };
   };
