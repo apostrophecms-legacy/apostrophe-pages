@@ -334,7 +334,10 @@ function AposPages() {
               // Block
               return;
             }
-            $.extend(true, data, result);
+            // Use _.extend to copy top level properties directly and avoid
+            // a recursive merge and appending of arrays which would prevent us
+            // from, for instance, clearing a list of tags
+            _.extend(data, result);
             return save();
           });
         }
