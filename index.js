@@ -131,7 +131,7 @@ function pages(options, callback) {
 
     return function(req, res) {
       // we can use the __ function here, since we're in a request
-      var __ = apos._aposLocals.__;
+      var __ = res.__;
 
       // let's push translations for the page types for this specific request
       // the reason we do it here, as opposed to a global push is because
@@ -491,7 +491,7 @@ function pages(options, callback) {
           }
         }
 
-        return res.send(self.renderPage(req, path ? path : req.template, args));
+        return res.send(self.renderPage(req, res, path ? path : req.template, args));
       }
     };
   };
@@ -2166,7 +2166,7 @@ function pages(options, callback) {
 
     apos.addLocal('aposPagesMenu', function(options) {
       // Pass the options as one argument so they can be passed on
-      return self.render('pagesMenu', { args: options }, __dirname + '/views');
+      return self.render('pagesMenu', { args: options });
     });
 
     apos.on('tasks:register', function(taskGroups) {
