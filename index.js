@@ -2233,8 +2233,6 @@ function pages(options, callback) {
         }
       };
     });
-    // After all of our routes
-    self.serveAssets();
   }
 
   async.series([ pathIndex ], callback);
