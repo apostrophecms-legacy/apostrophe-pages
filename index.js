@@ -140,7 +140,7 @@ function pages(options, callback) {
         return function(callback) {
           var start = now();
           return fn(function(err) {
-            console.log(name + ': ' + (now() - start));
+            // console.log(name + ': ' + (now() - start));
             return callback(err);
           });
         };
