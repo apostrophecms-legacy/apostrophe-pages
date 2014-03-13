@@ -133,21 +133,25 @@ function pages(options, callback) {
     return function(req, res) {
 
       function now() {
-        var time = process.hrtime();
-        return time[0] + (time[1] / 1000000000.0);
+        return Date.now();
       }
 
       function time(fn, name) {
         return function(callback) {
           var start = now();
           return fn(function(err) {
-            // console.log(name + ': ' + (now() - start));
+            console.log(name + ': ' + (now() - start));
             return callback(err);
           });
         };
       }
 
       var start = now();
+
+      // Let's defer slideshow joins until the last possible minute for
+      // all content loaded as part of this request, so we can do it with
+      // one efficient query instead of many queries
+      req.deferredSlideshows = [];
 
       // Express doesn't provide the absolute URL the user asked for by default.
       // TODO: move this to middleware for even more general availability in Apostrophe.
@@ -157,7 +161,7 @@ function pages(options, callback) {
       }
 
       req.extras = {};
-      return async.series([time(page, 'page'), time(permissions, 'permissions'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound')], main);
+      return async.series([time(page, 'page'), time(permissions, 'permissions'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(deferredSlideshows, 'deferred slideshows')], main);
 
       function page(callback) {
         // Get content for this page
@@ -371,6 +375,10 @@ function pages(options, callback) {
         } else {
           return callback(null);
         }
+      }
+
+      function deferredSlideshows(callback) {
+        return apos.joinSlideshows(req, req.deferredSlideshows, callback);
       }
 
       function main(err) {
