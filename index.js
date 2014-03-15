@@ -129,6 +129,24 @@ function pages(options, callback) {
     });
 
     return function(req, res) {
+      // we can use the __ function here, since we're in a request
+      var __ = res.__;
+
+      // let's push translations for the page types for this specific request
+      // the reason we do it here, as opposed to a global push is because
+      // we can't know which language the user wants until the request is served
+      var pageTypesLocaleStrings = {};
+      _.each(self.types, function(type){
+        pageTypesLocaleStrings[type.label] = __(type.label);
+
+        if(type.pluralLabel)
+          pageTypesLocaleStrings[type.pluralLabel] = __(type.pluralLabel);
+
+        if(type.instanceLabel)
+          pageTypesLocaleStrings[type.instanceLabel] = __(type.instanceLabel);
+      });
+
+      apos.pushLocaleStrings(pageTypesLocaleStrings, req);
 
       function now() {
         return Date.now();
@@ -1041,6 +1059,7 @@ function pages(options, callback) {
       }
     }
     self.types.push(type);
+
     apos.pushGlobalCallWhen('user', 'aposPages.addType(?)', { name: type.name, label: type.label });
   };
 
@@ -2159,7 +2178,7 @@ function pages(options, callback) {
 
     apos.addLocal('aposPagesMenu', function(options) {
       // Pass the options as one argument so they can be passed on
-      return self.render('pagesMenu', { args: options }, __dirname + '/views');
+      return self.render('pagesMenu', { args: options });
     });
 
     apos.on('tasks:register', function(taskGroups) {
