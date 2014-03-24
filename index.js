@@ -1627,7 +1627,7 @@ function pages(options, callback) {
   }
 
   if (options.ui) {
-    apos.mixinModuleAssets(self, 'apostrophe-pages', __dirname, options);
+    apos.mixinModuleAssets(self, 'pages', __dirname, options);
 
     self.pushAsset('script', 'jqtree', { when: 'user' });
     self.pushAsset('stylesheet', 'jqtree', { when: 'user' });
@@ -2171,10 +2171,6 @@ function pages(options, callback) {
         }
       });
     });
-
-    // Serve our assets. This is the final route so it doesn't
-    // beat out the rest
-    app.get(self._action + '/*', apos.static(__dirname + '/public'));
 
     apos.addLocal('aposPagesMenu', function(options) {
       // Pass the options as one argument so they can be passed on
