@@ -1905,10 +1905,28 @@ function pages(options, callback) {
       }
 
       function findVersions(callback) {
-        return apos.versions.find({ pageId: _id }, { _id: 1, diff: 1, createdAt: 1, author: 1}).sort({ createdAt: -1 }).toArray(function(err, versionsArg) {
+        return apos.versions.find({ pageId: _id }).sort({ createdAt: 1 }).toArray(function(err, versionsArg) {
+          if (err) {
+            return callback(err);
+          }
           versions = versionsArg;
           return callback(err);
         });
+      }
+
+      // We must diff on the fly because versions get pruned over time
+      function diffVersions(callback) {
+        var prior = null;
+        _.each(versions, function(version) {
+          if (!prior) {
+            version.diff = [ { value: '[NEW]', added: true } ];
+          } else {
+            version.diff = apos.diffPages(prior, version);
+          }
+          prior = version;
+        });
+        versions.reverse();
+        return callback(null);
       }
 
       function ready(err) {
@@ -1920,7 +1938,7 @@ function pages(options, callback) {
         }
       }
 
-      async.series([findPage, permissions, findVersions], ready);
+      async.series([findPage, permissions, findVersions, diffVersions], ready);
     });
 
     self.revertListeners = [];
