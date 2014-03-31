@@ -1,6 +1,6 @@
 var assert = require('assert');
 var mongo = require('mongodb');
-var _ = require('underscore');
+var _ = require('lodash');
 var apos = require('apostrophe')();
 
 var db;
