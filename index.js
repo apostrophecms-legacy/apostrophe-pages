@@ -365,7 +365,8 @@ function pages(options, callback) {
           }
         });
 
-        return async.parallel(loadList, callback);
+        // series lets later modules' loaders see the results of earlier ones
+        return async.series(loadList, callback);
       }
 
       function notfound(callback) {
