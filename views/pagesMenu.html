@@ -1,7 +1,7 @@
 {% if args.page and args.edit %}
 
-<ul class="apos-admin-bar-item apos-accordion-menu">
-  <li class="apos-accordion-title"><i class="icon-doc"></i>{{ __('Page') }}</li>
+<ul class="apos-admin-bar-item apos-accordion-menu {% if args.bottom %}apos-pages-menu{% endif %}">
+  <li class="apos-accordion-title"><i class="icon-doc"></i>{% if not args.bottom %}{{ __('Page') }}{% endif %}</li>
   <li class="apos-accordion-items">
     <ul class="apos-page-bar">
       <li data-slug="{{ args.page.slug | e }}" href="#" class="apos-control apos-accordion-item apos-button apos-new-page" data-new-page>{{ __('New Page') }}</li>
