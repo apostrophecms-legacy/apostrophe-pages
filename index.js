@@ -580,17 +580,47 @@ function pages(options, callback) {
         criteriaArg
       ]
     };
-    // Get metadata about the related pages, skipping expensive stuff.
-    // Sorting by path works because longer strings sort
-    // later than shorter prefixes
-    return apos.get(req, criteria, getOptions, function(err, results) {
+
+    var pages;
+    return async.series({
+      getAncestors: function(callback) {
+        // Get metadata about the related pages, skipping expensive stuff.
+        // Sorting by path works because longer strings sort
+        // later than shorter prefixes
+        return apos.get(req, criteria, getOptions, function(err, results) {
+          if (err) {
+            return callback(err);
+          }
+          pages = results.pages;
+          _.each(pages, function(page) {
+            page.url = options.root + page.slug;
+          });
+          return callback(null);
+        });
+      },
+      getChildrenOfAncestors: function(callback) {
+        if (!options.children) {
+          return callback(null);
+        }
+        // TODO: there is a clever mongo query to avoid
+        // separate invocations of getDescendants
+        return async.eachSeries(pages, function(page, callback) {
+          var childrenOptions = {};
+          _.merge(childrenOptions, options);
+          delete childrenOptions.children;
+          return self.getDescendants(req, page, {}, childrenOptions, function(err, pages) {
+            if (err) {
+              return callback(err);
+            }
+            page.children = pages;
+            return callback(null);
+          });
+        }, callback);
+      }
+    }, function (err) {
       if (err) {
         return callback(err);
       }
-      var pages = results.pages;
-      _.each(pages, function(page) {
-        page.url = options.root + page.slug;
-      });
       return callback(null, pages);
     });
   };

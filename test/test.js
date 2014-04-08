@@ -392,6 +392,27 @@ describe('apostrophe-pages', function() {
       assert(!ancestors[0].sidebar);
       assert(!ancestors[1].sidebar);
     });
+    it('did not return children', function() {
+      assert(!ancestors[0].children);
+      assert(!ancestors[1].children);
+    });
+    it('fetch again with children', function(done) {
+      var people = children[0].children[0];
+      pages.getAncestors(req, people, { children: true }, function(err, ancestorsArg) {
+        assert(!err);
+        assert(ancestorsArg);
+        ancestors = ancestorsArg;
+        done();
+      });
+    });
+    it('did return children arrays', function() {
+      assert(Array.isArray(ancestors[0].children));
+      assert(Array.isArray(ancestors[1].children));
+    });
+    it('children arrays are correct', function() {
+      assert(ancestors[0].children.length === 3);
+      assert(ancestors[1].children.length === 2);
+    });
   });
 
   describe('getParent returns home/about for home/about/people', function() {

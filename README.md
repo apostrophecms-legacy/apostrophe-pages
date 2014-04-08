@@ -100,6 +100,15 @@ To do the same thing for descendants of the home page, set:
       }
     }
 
+You can add a `._children` array to each ancestor in order to implement accordion navigation, in which each ancestor's children are also displayed:
+
+    {
+      ancestorOptions: {
+        children: true
+      }
+    }
+
+
 You can also shut off ancestors, descendants or tabs entirely if you're not interested:
 
     {
