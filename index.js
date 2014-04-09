@@ -255,11 +255,17 @@ function pages(options, callback) {
         if(!req.bestPage) {
           return callback(null);
         }
-        async.series([
-          function(callback) {
+        async.series({
+          ancestors: function(callback) {
             // If you want tabs you also get ancestors, so that
             // the home page is available (the parent of tabs).
             if (options.ancestors || options.tabs || true) {
+              var ancestorOptions = options.ancestorOptions ? _.cloneDeep(options.ancestorOptions) : {};
+              if (!ancestorOptions.childrenOptions) {
+                ancestorOptions.childrenOptions = {};
+              }
+              ancestorOptions.childrenOptions.orphan = false;
+
               return self.getAncestors(req, req.bestPage, options.ancestorCriteria || {}, options.ancestorOptions || {}, function(err, ancestors) {
                 req.bestPage.ancestors = ancestors;
                 if (ancestors.length) {
@@ -272,7 +278,7 @@ function pages(options, callback) {
               return callback(null);
             }
           },
-          function(callback) {
+          peers: function(callback) {
             if (options.peers || true) {
               var ancestors = req.bestPage.ancestors;
               if (!ancestors.length) {
@@ -288,7 +294,9 @@ function pages(options, callback) {
                 return callback(null);
               }
               var parent = ancestors[ancestors.length - 1];
-              self.getDescendants(req, parent, options.tabOptions || {}, function(err, pages) {
+              var peerOptions = options.peerOptions ? _.cloneDeep(options.peerOptions) : {};
+              peerOptions.orphan = false;
+              self.getDescendants(req, parent, peerOptions, function(err, pages) {
                 req.bestPage.peers = pages;
                 return callback(err);
               });
@@ -296,9 +304,11 @@ function pages(options, callback) {
               return callback(null);
             }
           },
-          function(callback) {
+          descendants: function(callback) {
             if (options.descendants || true) {
-              return self.getDescendants(req, req.bestPage, options.descendantCriteria || {}, options.descendantOptions || {}, function(err, children) {
+              var descendantOptions = options.descendantOptions ? _.cloneDeep(options.descendantOptions) : {};
+              descendantOptions.orphan = false;
+              return self.getDescendants(req, req.bestPage, options.descendantCriteria || {}, descendantOptions, function(err, children) {
                 req.bestPage.children = children;
                 return callback(err);
               });
@@ -306,9 +316,11 @@ function pages(options, callback) {
               return callback(null);
             }
           },
-          function(callback) {
+          tabs: function(callback) {
             if (options.tabs || true) {
-              self.getDescendants(req, req.bestPage.ancestors[0] ? req.bestPage.ancestors[0] : req.bestPage, options.tabCriteria || {}, options.tabOptions || {}, function(err, pages) {
+              var tabOptions = options.tabOptions ? _.cloneDeep(options.tabOptions) : {};
+              tabOptions.orphan = false;
+              self.getDescendants(req, req.bestPage.ancestors[0] ? req.bestPage.ancestors[0] : req.bestPage, options.tabCriteria || {}, tabOptions, function(err, pages) {
                 req.bestPage.tabs = pages;
                 return callback(err);
               });
@@ -316,7 +328,7 @@ function pages(options, callback) {
               return callback(null);
             }
           }
-        ], callback);
+        }, callback);
       }
 
       function load(callback) {
@@ -605,9 +617,7 @@ function pages(options, callback) {
         // TODO: there is a clever mongo query to avoid
         // separate invocations of getDescendants
         return async.eachSeries(pages, function(page, callback) {
-          var childrenOptions = {};
-          _.merge(childrenOptions, options);
-          delete childrenOptions.children;
+          var childrenOptions = options.childrenOptions || {};
           return self.getDescendants(req, page, {}, childrenOptions, function(err, pages) {
             if (err) {
               return callback(err);
@@ -678,9 +688,6 @@ function pages(options, callback) {
     _.defaults(options, {
       root: ''
     });
-    if (options.orphan === undefined) {
-      options.orphan = false;
-    }
 
     var depth = options.depth;
     // Careful, let them specify a depth of 0 but still have a good default
@@ -1216,6 +1223,7 @@ function pages(options, callback) {
     var nextRank;
     var published;
     var tags;
+    var orphan;
 
     title = apos.sanitizeString(data.title).trim();
     // Validation is annoying, automatic cleanup is awesome
@@ -1225,6 +1233,7 @@ function pages(options, callback) {
     seoDescription = apos.sanitizeString(data.seoDescription).trim();
 
     published = apos.sanitizeBoolean(data.published, true);
+    orphan = apos.sanitizeBoolean(req.body.orphan, false);
     tags = apos.sanitizeTags(data.tags);
     type = determineType(data.type);
 
@@ -1270,7 +1279,7 @@ function pages(options, callback) {
     }
 
     function insertPage(callback) {
-      page = { title: title, seoDescription: seoDescription, published: published, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+      page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
 
       // Permissions initially match those of the parent
       page.viewGroupIds = parent.viewGroupIds;
@@ -1367,6 +1376,8 @@ function pages(options, callback) {
     published = apos.sanitizeBoolean(req.body.published, true);
     tags = apos.sanitizeTags(req.body.tags);
 
+    orphan = apos.sanitizeBoolean(req.body.orphan, false);
+
     // Allows simple edits of page settings that aren't interested in changing the slug.
     // If you are allowing slug edits you must supply originalSlug.
     originalSlug = req.body.originalSlug || req.body.slug;
@@ -1389,7 +1400,6 @@ function pages(options, callback) {
     async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
 
     function getPage(callback) {
-
       return apos.getPage(req, originalSlug, function(err, pageArg) {
         page = pageArg;
         if ((!err) && (!page)) {
@@ -1412,6 +1422,7 @@ function pages(options, callback) {
       page.title = title;
       page.seoDescription = seoDescription;
       page.published = published;
+      page.orphan = orphan;
       page.slug = slug;
       page.tags = tags;
       type = determineType(req.body.type, page.type);
@@ -1433,7 +1444,13 @@ function pages(options, callback) {
           return callback(null);
         },
         putPage: function(callback) {
-          return apos.putPage(req, originalSlug, page, callback);
+          if (type.putOne) {
+            // A fancy page or similar
+            return type.putOne(req, originalSlug, {}, page, callback);
+          } else {
+            // A plain vanilla page template
+            return apos.putPage(req, originalSlug, page, callback);
+          }
         }
       }, callback);
     }

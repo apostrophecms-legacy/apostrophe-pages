@@ -66,6 +66,7 @@
       </div>
       {# END PERMISSIONS #}
 
+      {{ formBoolean('notOrphan', 'Show in Navigation') }}
       {# We don't allow the slug to be edited for a brand new post, #}
       {# but provide a block the edit template can override #}
       {% block slug %}

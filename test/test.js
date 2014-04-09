@@ -220,6 +220,39 @@ describe('apostrophe-pages', function() {
             published: true
           },
           {
+            _id: 'friends',
+            // This page is an "orphan" that should not show up
+            // if methods other than getAncestors are given the
+            // orphan: false flag
+            orphan: true,
+            path: 'home/about/friends',
+            title: 'Friends',
+            sortTitle: 'friends',
+            level: 2,
+            rank: 2,
+            slug: '/about/friends',
+            body: {
+              items: [
+                {
+                  type: 'richText',
+                  content: '<p>Body content</p>'
+                }
+              ],
+              type: 'area'
+            },
+            sidebar: {
+              items: [
+                {
+                  type: 'richText',
+                  content: '<p>Sidebar content</p>'
+                }
+              ],
+              type: 'area'
+            },
+            tags: [ 'friends' ],
+            published: true
+          },
+          {
             _id: 'products',
             path: 'home/products',
             title: 'Products',
@@ -293,6 +326,32 @@ describe('apostrophe-pages', function() {
       assert(!children[2].body);
     });
     it('have grandkids', function() {
+      assert(children[0].children.length === 3);
+    });
+    it('grandkids in order', function() {
+      assert(children[0].children[0]._id === 'people');
+      assert(children[0].children[1]._id === 'location');
+      assert(children[0].children[2]._id === 'friends');
+    });
+    it('fetch again with orphans turned off', function(done) {
+      pages.getDescendants(req, page, { depth: 2, orphan: false }, function(err, childrenArg) {
+        children = childrenArg;
+        assert(!err);
+        assert(children.length === 3);
+        done();
+      });
+    });
+    it('in order', function() {
+      assert(children[0]._id === 'about');
+      assert(children[1]._id === 'products');
+      assert(children[2]._id === 'contact');
+    });
+    it('did not return areas', function() {
+      assert(!children[0].body);
+      assert(!children[1].body);
+      assert(!children[2].body);
+    });
+    it('have correct number of grandkids', function() {
       assert(children[0].children.length === 2);
     });
     it('grandkids in order', function() {
@@ -411,7 +470,6 @@ describe('apostrophe-pages', function() {
     });
     it('children arrays are correct', function() {
       assert(ancestors[0].children.length === 3);
-      assert(ancestors[1].children.length === 2);
     });
   });
 
@@ -477,10 +535,10 @@ describe('apostrophe-pages', function() {
         return done();
      });
     });
-    it('home/about has 2 descendants', function(done) {
+    it('home/about has 3 descendants', function(done) {
       pages.getDescendants(req, about, { depth: 1 }, function(err, childrenArg) {
         children = childrenArg;
-        assert(children.length === 2);
+        assert(children.length === 3);
         done();
       });
     });
@@ -630,10 +688,11 @@ describe('apostrophe-pages', function() {
           return pages.getDescendants(apos.getTaskReq(), page, { depth: 2 }, function(err, childrenArg) {
             children = childrenArg;
             assert(!err);
-            assert(children.length === 2);
+            assert(children.length === 3);
             assert(children[0]._id === 'people');
             assert(children[0].slug === '/contact/about2/people');
             assert(children[1].slug === '/contact/about2/location');
+            assert(children[2].slug === '/contact/about2/friends');
             return done();
           });
         }
@@ -666,10 +725,11 @@ describe('apostrophe-pages', function() {
           return pages.getDescendants(apos.getTaskReq(), page, { depth: 2 }, function(err, childrenArg) {
             children = childrenArg;
             assert(!err);
-            assert(children.length === 2);
+            assert(children.length === 3);
             assert(children[0]._id === 'people');
             assert(children[0].slug === baseSlug + '/people');
             assert(children[1].slug === baseSlug + '/location');
+            assert(children[2].slug === baseSlug + '/friends');
             return done();
           });
         }

@@ -114,13 +114,11 @@ function AposPages() {
             //
             // TODO: refactor this frequently used dance of boolean values
             // into editor.js or content.js
-            var published = apos.data.aposPages.page.published;
-            if (published === undefined) {
-              published = 1;
-            } else {
-              // Simple POST friendly boolean values
-              published = published ? '1' : '0';
-            }
+
+            apos.enableBoolean($el.findByName('published'), apos.data.aposPages.page.published, true);
+
+            // We do not copy the parent's orphan status
+            apos.enableBoolean($el.findByName('notOrphan'), true);
 
             apos.enableTags($el.find('[data-name="tags"]'), []);
             refreshType();
@@ -164,7 +162,10 @@ function AposPages() {
                 // Simple POST friendly boolean values
                 published = published ? '1' : '0';
               }
-              $el.find('[name=published]').val(published);
+              apos.enableBoolean($el.findByName('published'), apos.data.aposPages.page.published, true);
+
+              apos.enableBoolean($el.findByName('notOrphan'), !apos.data.aposPages.page.orphan, true);
+
               $el.find('[name=type]').val(apos.data.aposPages.page.type);
               $el.find('[name=title]').val(apos.data.aposPages.page.title);
               var $seoDescription = $el.find('[name=seoDescription]');
@@ -288,15 +289,16 @@ function AposPages() {
       }
 
       function addOrEdit(action, options, callback) {
-        var typeName = $el.find('[name=type]').val();
+        var typeName = $el.find('[name="type"]').val();
         var type = aposPages.getType(typeName);
 
         var data = {
-          title: $el.find('[name=title]').val(),
-          slug: $el.find('[name=slug]').val(),
-          seoDescription: $el.find('[name=seoDescription]').val(),
-          type: $el.find('[name=type]').val(),
-          published: $el.find('[name=published]').val(),
+          title: $el.findByName('title').val(),
+          slug: $el.findByName('slug').val(),
+          seoDescription: $el.findByName('seoDescription').val(),
+          type: $el.findByName('type').val(),
+          published: apos.getBoolean($el.findByName('published')),
+          orphan: !apos.getBoolean($el.findByName('notOrphan')),
           tags: $el.find('[data-name="tags"]').selective('get')
         };
 
