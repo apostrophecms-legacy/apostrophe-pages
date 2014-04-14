@@ -221,3 +221,57 @@ pages: {
 
 Any searchable document whose page type does not have a specific filter is toggled by the `page` filter. *If you do not include a filter with the name `page` then such documents will not be visible in search results.* However this is frontend filtering and should not be relied upon to secure information by keeping it out of search. For that, if you are subclassing snippets, you may use the `searchable` option when configuring the module.
 
+## Context Menu
+
+Apostrophe's "page menu" in the lower left corner is designed to be context-sensitive. Its contents can be overridden for the current page by setting `req.contextMenu` in a page loader function.
+
+Here's an example:
+
+```javascript
+req.contextMenu = [
+  {
+    name: 'new-monkey',
+    label: 'New Monkey'
+  },
+  {
+    name: 'edit-page',
+    label: 'Page Settings'
+  },
+  {
+    name: 'versions-page',
+    label: 'Page Versions'
+  },
+  {
+    name: 'delete-page',
+    label: 'Move to Trash'
+  }
+  {
+    name: 'reorganize-page',
+    label: 'Reorganize'
+  }
+]
+```
+
+Note that if we set this property, any options we don't spell out will NOT appear. So you can use this option to hide standard choices like "Reorganize."
+
+The standard choices are as shown above beginning with `edit-page`.
+
+"How do I implement my `new-monkey` option?"
+
+The context menu outputs links with `data` attributes based on the `name` property. The links also get classes based on this property as you can see via "inspect element" in your browser.
+
+Consider this browser-side JavaScript, which invites the user to create a new page of type `monkey` when the above link is clicked:
+
+```javascript
+  $('body').on('click', '[data-new-monkey]', function() {
+    // Get metadata about the current page we're looking at
+    var page = apos.data.aposPages.page;
+
+    // Grab the title of the link for use at the top of the modal dialog
+    var title = $(this).text();
+    // Pop open the "new page" dialog with the page type set to
+    // "monkey"
+    var $el = aposPages.newPage(page.slug, { type: 'monkey', title: title });
+    return false;
+  });
+```

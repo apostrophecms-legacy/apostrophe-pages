@@ -1,7 +1,7 @@
 {% include 'formMacros.html' %}
 
 <div class="apos-page-settings apos-modal apos-template {% block class %}apos-new-page-settings{% endblock %}">
-  <h3 class="apos-modal-title">{% block action %}{{ __('New Page') }}{% endblock %}</h3>
+  <h3 class="apos-modal-title"><span data-title>{% block action %}{{ __('New Page') }}{% endblock %}</span></h3>
   <div class="apos-modal-controls">
     <a href="#" data-save class="apos-button apos-edit-modal apos-button-red">{{ __('Save') }}</a>
     <a href="#" data-cancel class="apos-button apos-edit-modal apos-button-white apos-button-arrow-left ">{{ __('Cancel') }}</a>
