@@ -177,7 +177,7 @@ function pages(options, callback) {
       }
 
       req.extras = {};
-      return async.series([time(page, 'page'), time(permissions, 'permissions'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(deferredSlideshows, 'deferred slideshows')], main);
+      return async.series([time(page, 'page'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(deferredSlideshows, 'deferred slideshows')], main);
 
       function page(callback) {
         // Get content for this page
@@ -214,41 +214,6 @@ function pages(options, callback) {
           return callback(null);
 
         });
-      }
-
-      function permissions(callback) {
-        // 404 in progress
-        if (!req.bestPage) {
-          return callback(null);
-        }
-
-        // Are we cool enough to view and/or edit this page?
-        async.series([checkView, checkEdit], callback);
-
-        function checkView(callback) {
-          return apos.permissions(req, 'view-page', req.bestPage, function(err) {
-            // If there is a permissions error then note that we are not
-            // cool enough to see the page, which triggers the appropriate
-            // error type.
-            if (err) {
-              if (req.user) {
-                req.insufficient = true;
-              } else {
-                req.loginRequired = true;
-              }
-            }
-            return callback(null);
-          });
-        }
-
-        function checkEdit(callback) {
-          return apos.permissions(req, 'edit-page', req.bestPage, function(err) {
-            // If there is no permissions error then note that we are cool
-            // enough to edit the page
-            req.edit = !err;
-            return callback(null);
-          });
-        }
       }
 
       function relatives(callback) {
@@ -481,10 +446,38 @@ function pages(options, callback) {
         }
 
         var args = {
-          edit: req.edit,
+          edit: providePage ? req.bestPage._edit : null,
           slug: providePage ? req.bestPage.slug : null,
-          page: providePage ? req.bestPage : null
+          page: providePage ? req.bestPage : null,
+          // Allow page loaders to set the context menu
+          contextMenu: req.contextMenu
         };
+
+        if (args.page && args.edit && (!args.contextMenu)) {
+          // Standard context menu for a regular page
+          args.contextMenu = [
+            {
+              name: 'new-page',
+              label: 'New Page'
+            },
+            {
+              name: 'edit-page',
+              label: 'Page Settings'
+            },
+            {
+              name: 'versions-page',
+              label: 'Page Versions'
+            },
+            {
+              name: 'delete-page',
+              label: 'Move to Trash'
+            },
+            {
+              name: 'reorganize-page',
+              label: 'Reorganize'
+            }
+          ];
+        }
 
         _.extend(args, req.extras);
 
@@ -1234,8 +1227,14 @@ function pages(options, callback) {
 
     published = apos.sanitizeBoolean(data.published, true);
     orphan = apos.sanitizeBoolean(req.body.orphan, false);
+
     tags = apos.sanitizeTags(data.tags);
     type = determineType(data.type);
+
+    if (type.orphan) {
+      // Type-level override of the orphan flag
+      orphan = true;
+    }
 
     return async.series([ getParent, permissions, getNextRank, insertPage ], function(err) {
       if (err) {
@@ -1302,7 +1301,12 @@ function pages(options, callback) {
           return callback(null);
         },
         putPage: function(callback) {
-          return apos.putPage(req, page.slug, page, callback);
+          if (type.putOne) {
+            // A fancy page or similar
+            return type.putOne(req, page.slug, {}, page, callback);
+          } else {
+            return apos.putPage(req, page.slug, page, callback);
+          }
         }
       }, function(err) {
         if (err) {
@@ -1422,10 +1426,17 @@ function pages(options, callback) {
       page.title = title;
       page.seoDescription = seoDescription;
       page.published = published;
-      page.orphan = orphan;
       page.slug = slug;
       page.tags = tags;
       type = determineType(req.body.type, page.type);
+
+      if (type.orphan) {
+        // Type-level override of the orphan flag
+        orphan = true;
+      }
+
+      page.orphan = orphan;
+
       page.type = type.name;
 
       if ((slug !== originalSlug) && (originalSlug === '/')) {

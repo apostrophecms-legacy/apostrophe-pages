@@ -99,16 +99,20 @@ function AposPages() {
       // Active dialog
       var $el;
 
-      $('body').on('click', '.apos-new-page', function() {
-        var parent = $(this).data('slug');
+      $('body').on('click', '[data-new-page]', function() {
+        var parent = apos.data.aposPages.page.slug;
         var pageType = $(this).data('pageType');
 
+        self.newPage(parent, { pageType: pageType });
+        return false;
+      });
+
+      self.newPage = function(parent, options) {
+        options = options || {};
         $el = apos.modalFromTemplate('.apos-new-page-settings', {
           init: function(callback) {
 
-            // We now can pass an argument to this function that allows a certain page type
-            // (identified in the data attribute "page-type") to be automatically selected.
-            populateType(pageType);
+            populateType(options.pageType);
 
             // Copy parent's published status
             //
@@ -124,13 +128,16 @@ function AposPages() {
             refreshType();
 
             // Let's go ahead and try to populate the page type setting
-            if (pageType) {
-              type = pageType;
+            if (options.pageType) {
+              type = options.pageType;
             }
 
             // $el.findByName('published').val(apos.data.pages.parent.published)
             // Copy parent permissions
             enablePermissions(apos.data.aposPages.page);
+            if (options.title) {
+              $el.find('[data-title]').text(options.title);
+            }
             return callback(null);
           },
           save: save
@@ -138,11 +145,11 @@ function AposPages() {
         function save(callback) {
           return addOrEdit('new', { parent: parent }, callback);
         }
-        return false;
-      });
+        return $el;
+      };
 
       $('body').on('click', '.apos-edit-page', function() {
-        var slug = $(this).data('slug');
+        var slug = apos.data.aposPages.page.slug;
 
         // Get a more robust JSON representation that includes
         // joined objects if any
@@ -151,7 +158,7 @@ function AposPages() {
           $el = apos.modalFromTemplate('.apos-edit-page-settings', {
             save: save,
             init: function(callback) {
-              populateType();
+              populateType(apos.data.aposPages.page.type);
 
               // TODO: refactor this frequently used dance of boolean values
               // into editor.js or content.js
@@ -212,27 +219,40 @@ function AposPages() {
       });
 
       function populateType(presetType) {
-        if (!_.find(apos.data.aposPages.types, function(type) {
-          return apos.data.aposPages.page.type === type.name;
-        })) {
-          // Don't let anyone mess with the type of an existing page whose type is not
-          // on the menu, such as the search page
-          $el.find('[data-name="type"]').remove();
-          return;
-        }
         var $type = $el.find('[name=type]');
         $type.html('');
+        var found = false;
+        var $options;
+        var type;
         _.each(apos.data.aposPages.menu || apos.data.aposPages.types, function(type) {
-          var $option = $('<option></option>');
+          $option = $('<option></option>');
           // The label is wrapped in i18n
           $option.text( __(type.label) );
           $option.attr('value', type.name);
           // If we've passed in the presetType, let's select that one.
           if (type.name === presetType) {
             $option.attr('selected', true);
+            found = true;
           }
           $type.append($option);
         });
+        if (presetType && (!found)) {
+          // if the preset type is not one of the choices, populate the
+          // menu with that one choice and hide it. It's going to be
+          // something like blogPost that shouldn't be switched
+          type = _.find(apos.data.aposPages.types, function(type) {
+            return (type.name === presetType);
+          });
+          if (type) {
+            $type.html('');
+            $option = $('<option></option>');
+            // The label is wrapped in i18n
+            $option.text( __(type.label) );
+            $option.attr('value', type.name);
+            $type.append($option);
+            $el.find('[data-name="type"]').hide();
+          }
+        }
         // Some types have custom settings of their own. When appropriate
         // instantiate the additional template and make it part of the form.
         // If the type has a selector for a settings template (settings.sel)
@@ -260,6 +280,12 @@ function AposPages() {
         }
 
         var type = aposPages.getType(typeName);
+        if (type.orphan) {
+          // Locked for this type
+          $el.find('[data-name="notOrphan"]').hide();
+        } else {
+          $el.find('[data-name="notOrphan"]').show();
+        }
         if (type.settings) {
           var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._typeCss);
           $el.find('[data-type-details]').html($typeEl);
@@ -589,7 +615,7 @@ function AposPages() {
     });
 
     $('body').on('click', '.apos-delete-page', function() {
-      var slug = $(this).data('slug');
+      var slug = apos.data.aposPages.page.slug;
       $.ajax(
         {
           url: '/apos-pages/delete',
