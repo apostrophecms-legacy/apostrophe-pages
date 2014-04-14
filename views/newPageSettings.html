@@ -20,8 +20,7 @@
         <a data-show-view-permissions href="#">{{ __('Who can see this?') }}</a>
         <div class="apos-view-permissions apos-page-settings-toggle-content">
           <fieldset class="apos-fieldset apos-fieldset-select apos-fieldset-login-required" data-name="{{ loginRequired }}">
-            <label>{{ __('Permitted') }}</label>
-            {{ formSelectStandalone('loginRequired',
+            {{ formSelect('loginRequired', 'Permitted', 
                 [
                   {
                     value: '',
@@ -36,8 +35,7 @@
                     label: 'Certain People'
                   }
                 ]
-              )
-            }}
+            )}}
             <span class="apos-propagate"><input type="checkbox" name="loginRequiredPropagate" /> {{ __('Apply to Subpages') }}</span>
           </fieldset>
           {# js shows this class when "Certain People" is chosen #}
