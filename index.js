@@ -1895,12 +1895,12 @@ function pages(options, callback) {
 
     app.all(self._action + '/autocomplete', function(req, res) {
       var criteria = { slug: /^\// };
+      var data = (req.method === 'POST') ? req.body : req.query;
       var options = {
         fields: self.getAutocompleteFields(),
-        limit: req.query.limit || 50,
-        skip: req.query.skip
+        limit: apos.sanitizeInteger(data.limit, 50),
+        skip: apos.sanitizeInteger(data.skip, 0)
       };
-      var data = (req.method === 'POST') ? req.body : req.query;
       if (data.term !== undefined) {
         options.titleSearch = data.term;
       } else if (data.values !== undefined) {
@@ -1911,12 +1911,12 @@ function pages(options, callback) {
         // empty `ids` array
         return res.send(JSON.stringify([]));
       }
-      if (req.query.type) {
-        criteria.type = req.query.type;
+      if (data.type) {
+        criteria.type = apos.sanitizeString(data.type);
       }
-      if (data.values && data.values.length && (req.query.limit === undefined)) {
+      if (data.values && data.values.length && (data.limit === undefined)) {
         // We are loading specific items to repopulate a control,
-        // so get all of them
+        // so get all of them, don't set a default limit
         delete options.limit;
       }
       // If requested, allow autocomplete to find unpublished
@@ -1934,8 +1934,8 @@ function pages(options, callback) {
         }
         var pages = results.pages;
         // Put the pages in id order, $in does NOT do this
-        if (req.query.values) {
-          pages = self._apos.orderById(req.query.values, pages);
+        if (data.values) {
+          pages = apos.orderById(data.values, pages);
         }
         return res.send(
           JSON.stringify(_.map(pages, function(snippet) {

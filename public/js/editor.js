@@ -325,17 +325,17 @@ function AposPages() {
           type: $el.findByName('type').val(),
           published: apos.getBoolean($el.findByName('published')),
           orphan: !apos.getBoolean($el.findByName('notOrphan')),
-          tags: $el.find('[data-name="tags"]').selective('get')
+          tags: $el.find('[data-name="tags"]').selective('get', { incomplete: true })
         };
 
         // Permissions are fancy! But the server does most of the hard work
         data.loginRequired = $el.findByName('loginRequired').val();
         data.loginRequiredPropagate = $el.findByName('loginRequiredPropagate').is(':checked') ? '1' : '0';
         // "certain people" (specific users/groups)
-        data.viewGroupIds = $el.find('[data-name="viewGroupIds"]').selective('get');
-        data.viewPersonIds = $el.find('[data-name="viewPersonIds"]').selective('get');
-        data.editGroupIds = $el.find('[data-name="editGroupIds"]').selective('get');
-        data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get');
+        data.viewGroupIds = $el.find('[data-name="viewGroupIds"]').selective('get', { incomplete: true });
+        data.viewPersonIds = $el.find('[data-name="viewPersonIds"]').selective('get', { incomplete: true });
+        data.editGroupIds = $el.find('[data-name="editGroupIds"]').selective('get', { incomplete: true });
+        data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get', { incomplete: true });
 
         _.extend(data, { parent: options.parent, originalSlug: options.slug });
 
