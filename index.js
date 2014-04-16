@@ -231,7 +231,7 @@ function pages(options, callback) {
               }
               ancestorOptions.childrenOptions.orphan = false;
 
-              return self.getAncestors(req, req.bestPage, options.ancestorCriteria || {}, options.ancestorOptions || {}, function(err, ancestors) {
+              return self.getAncestors(req, req.bestPage, options.ancestorCriteria || {}, ancestorOptions || {}, function(err, ancestors) {
                 req.bestPage.ancestors = ancestors;
                 if (ancestors.length) {
                   // Also set parent as a convenience
