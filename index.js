@@ -2136,73 +2136,32 @@ function pages(options, callback) {
       }
       req.extras.searchFilters = searchFilters;
 
-      var q = req.query.q;
+      var q = apos.sanitizeString(req.query.q);
       req.extras.q = q;
-      // Turn it into a regular expression
-      q = apos.searchify(q);
+
       var resultGroups = [];
-      var queries = [
-        { sortTitle: q },
-        { highSearchText: q },
-        { lowSearchText: q }
-      ];
-      apos.emit('addSearchCriteria', req, queries);
+      var query = {};
+      apos.emit('addSearchCriteria', req, query);
 
-      // TODO: add some more variants considered even better matches, such as
-      // exact word boundaries rather than embedded words. We can afford it,
-      // mongo+node's awfully fast even at this crappy scanning stuff
-
-      function find(callback) {
-        return async.mapSeries(queries, function(query, callback) {
-          apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1, startTime: 1, start: 1, endDate: 1, endTime: 1, end: 1 }, limit: 100 }, function(err, results) {
-            if (err) {
-              return callback(err);
-            }
-            // Most recent first. The best definition of most recent is
-            // somewhat type dependent.
-            results.pages.sort(function(a, b) {
-              var d1 = a.start || a.publishedAt || a.createdAt;
-              var d2 = b.start || b.publishedAt || b.createdAt;
-              if (d1) {
-                d1 = d1.getTime();
-              }
-              if (d2) {
-                d2 = d2.getTime();
-              }
-              if (d1 > d2) {
-                return -1;
-              } else if (d1 === d2) {
-                return 0;
-              } else {
-                return 1;
-              }
-            });
-            return callback(null, results.pages);
-          });
-        }, function(err, resultGroupsArg) {
-          resultGroups = resultGroupsArg;
-          return callback(null);
-        });
+      var sort;
+      if ((!req.query.sort) || (req.query.sort === 'quality')) {
+        sort = 'q';
+      } else {
+        // Chronological sort
+        sort = { start: -1, publishedAt: -1, createdAt: -1 };
       }
 
-      function finish(err) {
+      return apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1, startTime: 1, start: 1, endDate: 1, endTime: 1, end: 1 }, limit: 100, q: q, sort: sort }, function(err, results) {
         if (err) {
-          res.statusCode = 500;
-          return res.send(err);
+          console.error(err);
+          req.statusCode = 500;
+          return callback(null);
         }
-        var results = [];
-        var taken = {};
-        _.each(resultGroups, function(resultGroup) {
-          _.each(resultGroup, function(page) {
-            if ((!taken[page.slug]) && suitable(page)) {
-              results.push(page);
-              taken[page.slug] = true;
-            }
-          });
+        req.extras.search = _.filter(results.pages, function(result) {
+          return suitable(result);
         });
-        req.extras.search = results;
         return callback(null);
-      }
+      });
 
       // Vetoes anything belonging to a snippets module that has
       // specifically declared itself unsearchable
