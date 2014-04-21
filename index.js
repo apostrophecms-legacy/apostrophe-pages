@@ -177,7 +177,8 @@ function pages(options, callback) {
       }
 
       req.extras = {};
-      return async.series([time(page, 'page'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(deferredSlideshows, 'deferred slideshows')], main);
+
+      return async.series([time(page, 'page'), time(secondChanceLogin, 'secondChanceLogin'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(deferredSlideshows, 'deferred slideshows')], main);
 
       function page(callback) {
         // Get content for this page
@@ -213,6 +214,32 @@ function pages(options, callback) {
 
           return callback(null);
 
+        });
+      }
+
+      function secondChanceLogin(callback) {
+        if (!options.secondChanceLogin) {
+          return callback(null);
+        }
+
+        if (req.user) {
+          return callback(null);
+        }
+
+        if (req.page) {
+          return callback(null);
+        }
+        // Try again with admin privs. If we get a better page,
+        // note the URL in the session and redirect to login
+        return apos.getPage(apos.getTaskReq(), req.slug, function(e, page, bestPage, remainder) {
+          if (e) {
+            return callback(e);
+          }
+          if (page || (bestPage && req.bestPage.slug < bestPage.slug)) {
+            req.session.aposAfterLogin = req.url;
+            return res.redirect('/login');
+          }
+          return callback(null);
         });
       }
 
