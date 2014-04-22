@@ -1669,7 +1669,7 @@ function pages(options, callback) {
     // Allow for sanitization of data submitted for specific page types.
     // If there is no sanitize function assume there is no data for safety
     if (type.settings && type.settings.sanitize) {
-      type.settings.sanitize(data || {}, function(err, data) {
+      return type.settings.sanitize(req, data || {}, function(err, data) {
         if (err) {
           return callback(err);
         } else {
