@@ -1001,7 +1001,17 @@ function pages(options, callback) {
       } else {
         $unset.trash = true;
       }
-      apos.pages.update({ path: matchParentPathPrefix }, { $set: $set, $unset: $unset }, callback);
+      var action = {};
+      if (!_.isEmpty($set)) {
+        action.$set = $set;
+      }
+      if (!_.isEmpty($unset)) {
+        action.$unset = $unset;
+      }
+      if (_.isEmpty(action)) {
+        return setImmediate(callback);
+      }
+      return apos.pages.update({ path: matchParentPathPrefix }, action, callback);
     }
     function finish(err) {
       if (err) {
