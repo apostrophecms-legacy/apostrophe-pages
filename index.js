@@ -1834,8 +1834,14 @@ function pages(options, callback) {
         var data = {
           label: page.title
         };
+
         // trash: 'any' means return both trash and non-trash
-        self.getDescendants(req, page, { depth: 1000, trash: 'any', orphan: 'any' }, function(err, children) {
+
+        // Don't fetch pages that are part of the tree but explicitly
+        // reject being displayed by "reorganize", such as blog articles
+        // (they are too numerous and are best managed within the blog)
+
+        self.getDescendants(req, page, { reorganize: { $ne: false } }, { depth: 1000, trash: 'any', orphan: 'any' }, function(err, children) {
           page.children = children;
           // jqtree supports more than one top level node, so we have to pass an array
           data = [ pageToJqtree(page) ];
