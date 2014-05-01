@@ -98,6 +98,7 @@ function AposPages() {
       var oldTypeName;
       // Active dialog
       var $el;
+      var defaults;
 
       $('body').on('click', '[data-new-page]', function() {
         var parent = apos.data.aposPages.page.slug;
@@ -108,6 +109,7 @@ function AposPages() {
       });
 
       self.newPage = function(parent, options) {
+        defaults = {};
         options = options || {};
         $el = apos.modalFromTemplate('.apos-new-page-settings', {
           init: function(callback) {
@@ -155,34 +157,35 @@ function AposPages() {
         // joined objects if any
         $.getJSON(aposPages.options.root + apos.data.aposPages.page.slug + '?pageInformation=json', function(data) {
           apos.data.aposPages.page = data;
+          defaults = data;
           $el = apos.modalFromTemplate('.apos-edit-page-settings', {
             save: save,
             init: function(callback) {
-              populateType(apos.data.aposPages.page.type);
+              populateType(defaults.type);
 
               // TODO: refactor this frequently used dance of boolean values
               // into editor.js or content.js
-              var published = apos.data.aposPages.page.published;
+              var published = defaults.published;
               if (published === undefined) {
                 published = 1;
               } else {
                 // Simple POST friendly boolean values
                 published = published ? '1' : '0';
               }
-              apos.enableBoolean($el.findByName('published'), apos.data.aposPages.page.published, true);
+              apos.enableBoolean($el.findByName('published'), defaults.published, true);
 
-              apos.enableBoolean($el.findByName('notOrphan'), !apos.data.aposPages.page.orphan, true);
+              apos.enableBoolean($el.findByName('notOrphan'), !defaults.orphan, true);
 
-              $el.find('[name=type]').val(apos.data.aposPages.page.type);
-              $el.find('[name=title]').val(apos.data.aposPages.page.title);
+              $el.find('[name=type]').val(defaults.type);
+              $el.find('[name=title]').val(defaults.title);
               var $seoDescription = $el.find('[name=seoDescription]');
-              $seoDescription.val(apos.data.aposPages.page.seoDescription || '');
+              $seoDescription.val(defaults.seoDescription || '');
               $el.find('[name=slug]').val(slug);
-              apos.enableTags($el.find('[data-name="tags"]'), apos.data.aposPages.page.tags);
+              apos.enableTags($el.find('[data-name="tags"]'), defaults.tags);
 
               refreshType();
 
-              enablePermissions(apos.data.aposPages.page);
+              enablePermissions(defaults);
 
               // Watch the title for changes, update the slug - but only if
               // the slug was in sync with the title to start with
@@ -289,7 +292,6 @@ function AposPages() {
         if (type.settings) {
           var $typeEl = apos.fromTemplate('.apos-page-settings-' + type._typeCss);
           $el.find('[data-type-details]').html($typeEl);
-          var typeDefaults = apos.data.aposPages.page;
           var unserialize = type.settings.unserialize;
 
           // Tolerate unserialize methods without a callback.
@@ -303,7 +305,7 @@ function AposPages() {
             };
           }
 
-          unserialize(typeDefaults, $el, $typeEl, function(err) {
+          unserialize(defaults, $el, $typeEl, function(err) {
             apos.emit('enhance', $typeEl);
             // TODO: refreshType should take a callback of its own but
             // for now there is nothing to invoke and nothing that absolutely
