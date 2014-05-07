@@ -1334,8 +1334,7 @@ function pages(options, callback) {
           return addSanitizedTypeData(req, data, page, type, callback);
         },
         sanitizeSpontaneousAreas: function(callback) {
-          sanitizeSpontaneousAreas(data, page);
-          return callback(null);
+          return sanitizeSpontaneousAreas(req, data, page, callback);
         },
         putPage: function(callback) {
           if (type.putOne) {
@@ -1488,8 +1487,7 @@ function pages(options, callback) {
           return addSanitizedTypeData(req, req.body, page, type, callback);
         },
         sanitizeSpontaneousAreas: function(callback) {
-          sanitizeSpontaneousAreas(req.body, page);
-          return callback(null);
+          return sanitizeSpontaneousAreas(req, req.body, page, callback);
         },
         putPage: function(callback) {
           if (type.putOne) {
@@ -1532,17 +1530,34 @@ function pages(options, callback) {
   // object with a "type" sub-property set to "area", that is accepted and
   // sanitized as an area.
 
-  function sanitizeSpontaneousAreas(data, page) {
+  function sanitizeSpontaneousAreas(req, data, page, callback) {
+    var toSanitize = [];
     _.each(data, function(val, key) {
       if (typeof(val) === 'object') {
         if (val.type === 'area') {
-          if (_.has(page, key) && ((typeof(val) !== 'object') || (val.type !== 'area'))) {
+          if (_.has(page, key) && ((typeof(page[key]) !== 'object') || (page[key].type !== 'area'))) {
             // Spontaneous areas may not replace properties that are not areas
             return;
           }
-          page[key] = { type: 'area', items: self._apos.sanitizeItems(val.items || []) };
+          toSanitize.push({ key: key, items: val.items });
         }
       }
+    });
+    return async.eachSeries(toSanitize, function(entry, callback) {
+      return self._apos.sanitizeItems(req, entry.items || [], function(err, _items) {
+        if (err) {
+          return callback(err);
+        }
+        entry.items = _items;
+        return callback(null);
+      });
+    }, function(err) {
+      if (err) {
+        return callback(err);
+      }
+      _.each(toSanitize, function(entry) {
+        page[entry.key] = { type: 'area', items: entry.items };
+      });
     });
   }
 
