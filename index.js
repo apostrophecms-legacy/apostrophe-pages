@@ -1544,7 +1544,7 @@ function pages(options, callback) {
       }
     });
     return async.eachSeries(toSanitize, function(entry, callback) {
-      return self._apos.sanitizeItems(req, entry.items || [], function(err, _items) {
+      return apos.sanitizeItems(req, entry.items || [], function(err, _items) {
         if (err) {
           return callback(err);
         }
@@ -1558,6 +1558,7 @@ function pages(options, callback) {
       _.each(toSanitize, function(entry) {
         page[entry.key] = { type: 'area', items: entry.items };
       });
+      return callback(null);
     });
   }
 

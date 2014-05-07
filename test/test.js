@@ -635,13 +635,23 @@ describe('apostrophe-pages', function() {
           title: 'New Kid',
           published: true,
           tags: [ 'one', 'two' ],
-          type: 'default'
+          type: 'default',
+          body: {
+            type: 'area',
+            items: [
+              {
+                type: 'richText',
+                content: 'This is a test'
+              }
+            ]
+          }
         }
       };
       var res = {
         send: function(data) {
           assert((!res.statusCode) || (res.statusCode === 200));
           var page = JSON.parse(data);
+          assert(page.body.items.length > 0);
           assert(typeof(page) === 'object');
           assert(page.slug === '/contact/new-kid');
           return apos.getPage(req, '/contact', function(err, page) {
