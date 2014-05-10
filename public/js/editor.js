@@ -127,20 +127,22 @@ function AposPages() {
             apos.enableBoolean($el.findByName('notOrphan'), true);
 
             apos.enableTags($el.find('[data-name="tags"]'), []);
-            refreshType();
 
-            // Let's go ahead and try to populate the page type setting
-            if (options.pageType) {
-              type = options.pageType;
-            }
+            refreshType(function() {
 
-            // $el.findByName('published').val(apos.data.pages.parent.published)
-            // Copy parent permissions
-            enablePermissions(apos.data.aposPages.page);
-            if (options.title) {
-              $el.find('[data-title]').text(options.title);
-            }
-            return callback(null);
+              // Let's go ahead and try to populate the page type setting
+              if (options.pageType) {
+                type = options.pageType;
+              }
+
+              // $el.findByName('published').val(apos.data.pages.parent.published)
+              // Copy parent permissions
+              enablePermissions(apos.data.aposPages.page);
+              if (options.title) {
+                $el.find('[data-title]').text(options.title);
+              }
+              return callback(null);
+            });
           },
           save: save
         });
@@ -183,19 +185,19 @@ function AposPages() {
               $el.find('[name=slug]').val(slug);
               apos.enableTags($el.find('[data-name="tags"]'), defaults.tags);
 
-              refreshType();
+              refreshType(function() {
+                enablePermissions(defaults);
 
-              enablePermissions(defaults);
+                // Watch the title for changes, update the slug - but only if
+                // the slug was in sync with the title to start with
 
-              // Watch the title for changes, update the slug - but only if
-              // the slug was in sync with the title to start with
+                var $slug = $el.find('[name=slug]');
+                var $title = $el.find('[name=title]');
 
-              var $slug = $el.find('[name=slug]');
-              var $title = $el.find('[name=title]');
+                apos.suggestSlugOnTitleEdits($slug, $title);
 
-              apos.suggestSlugOnTitleEdits($slug, $title);
-
-              return callback(null);
+                return callback(null);
+              });
             }
           });
         });
@@ -266,15 +268,15 @@ function AposPages() {
         // your unserialize function.
 
         $el.on('change', '[name=type]', function() {
-          refreshType();
+          refreshType(function() {});
         });
       }
 
-      function refreshType() {
+      function refreshType(callback) {
         var $type = $el.find('[name=type]');
         if (!$type.length) {
           // Type changes not allowed for this page
-          return;
+          return callback();
         }
 
         var typeName = $el.find('[name=type]').val();
@@ -301,18 +303,17 @@ function AposPages() {
             var superUnserialize = unserialize;
             unserialize = function(data, $el, $details, callback) {
               superUnserialize(data, $el, $details);
-              return callback(null);
+              return callback();
             };
           }
 
           unserialize(defaults, $el, $typeEl, function(err) {
             apos.emit('enhance', $typeEl);
-            // TODO: refreshType should take a callback of its own but
-            // for now there is nothing to invoke and nothing that absolutely
-            // depends on running after it
+            return callback();
           });
         } else {
           $el.find('[data-type-details]').html('');
+          return callback();
         }
       }
 
