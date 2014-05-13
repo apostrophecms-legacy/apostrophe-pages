@@ -1169,6 +1169,27 @@ function pages(options, callback) {
 
   self.getManager = function(nameOrObject) {
     var name = nameOrObject.type || nameOrObject;
+
+    if (name === 'page') {
+      // A special case: we are interested in all "regular pages", those that
+      // have a slug starting with "/" and are therefore directly part
+      // of the page tree. Provide a manager object with a suitable
+      // "get" method.
+      return {
+        get: function(req, _criteria, filters, callback) {
+          var criteria = {
+            $and: [
+              {
+                slug: /^\//
+              },
+              _criteria
+            ]
+          };
+          return apos.get(req, criteria, filters, callback);
+        }
+      };
+    }
+
     var instanceManager = self.getIndexTypes(name)[0];
     if (instanceManager) {
       return instanceManager;
@@ -1922,7 +1943,9 @@ function pages(options, callback) {
     self.addExtraAutocompleteCriteria = function(req, criteria, options) {
     };
 
-    // Can be overridden if titles aren't enough to identify pages for autocomplete
+    // Can be overridden if titles & slugs aren't enough to identify
+    // pages for autocomplete. We also send the slug as a
+    // separate property from "label".
     self.getAutocompleteTitle = function(snippet) {
       return snippet.title;
     };
@@ -1930,7 +1953,7 @@ function pages(options, callback) {
     // For performance this is minimal but if you need more data in your JSON
     // response you can have it
     self.getAutocompleteFields = function() {
-      return { title: 1, _id: 1 };
+      return { title: 1, _id: 1, slug: 1 };
     };
 
     // Autocomplete for Pages in the Page Tree
@@ -1970,7 +1993,8 @@ function pages(options, callback) {
         // empty `ids` array
         return res.send(JSON.stringify([]));
       }
-      if (data.type) {
+      // The special "page" type means "any page in the page tree"
+      if (data.type && (data.type !== 'page')) {
         criteria.type = apos.sanitizeString(data.type);
       }
       if (data.values && data.values.length && (data.limit === undefined)) {
@@ -1998,7 +2022,7 @@ function pages(options, callback) {
         }
         return res.send(
           JSON.stringify(_.map(pages, function(snippet) {
-              return { label: self.getAutocompleteTitle(snippet), value: snippet._id };
+              return { label: self.getAutocompleteTitle(snippet), value: snippet._id, slug: snippet.slug };
           }))
         );
       });
