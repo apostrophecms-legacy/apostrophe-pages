@@ -37,10 +37,37 @@
 }
 
 .apos-reorganize-page {
+  .apos-reorganize-controls
+  {
+    display: inline-block;
+    float: right;
+    margin-left: 20px;
+    margin-top: -3px;
+  }
   .apos-visit, .apos-delete {
     display: inline-block;
     margin-left: 10px;
-    margin-right: 10px;
+    text-decoration: none;
+    font-size: 17px;
+    font-weight: bold;
+    .transition();
+    &, i {
+      color: white;
+      color: rgba(255,255,255,0.5);
+    }
+    &:hover
+    {
+      &, i
+      {
+        color: rgba(255,255,255,1);
+      }
+    }
+    // margin-right: 10px;
+  }
+  .apos-visit
+  {
+    position: relative;
+    top: 1px;
   }
   .apos-delete {
     color: red;

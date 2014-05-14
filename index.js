@@ -1770,6 +1770,7 @@ function pages(options, callback) {
     self.pushAsset('stylesheet', 'editor', { when: 'user' });
     self.pushAsset('template', 'newPageSettings', { when: 'user' });
     self.pushAsset('template', 'editPageSettings', { when: 'user' });
+    self.pushAsset('stylesheet', 'reorganize', { when: 'user' });
     self.pushAsset('template', 'reorganize', { when: 'user' });
     self.pushAsset('template', 'pageVersions', { when: 'user' });
 

@@ -484,21 +484,24 @@ function AposPages() {
               if (node.slug == '/trash') {
                 $li.addClass('apos-trash');
               }
+              $li.find('.jqtree-element').append($('<span class="apos-reorganize-controls"></span>'))
               // Append a link to the jqtree-element div.
               // The link has a url '#node-[id]' and a data property 'node-id'.
               var link = $('<a class="apos-visit"></a>');
               link.attr('data-node-id', node.id);
               link.attr('data-visit', '1');
               link.attr('href', '#');
-              link.text('»');
-              $li.find('.jqtree-element').append(link);
+              // link.text('»');
+              link.append('<i class="icon icon-external-link"></i>');
+              $li.find('.jqtree-element .apos-reorganize-controls').append(link);
 
               link = $('<a class="apos-delete"></a>');
               link.attr('data-node-id', node.id);
               link.attr('data-delete', '1');
               link.attr('href', '#');
-              link.text('x');
-              $li.find('.jqtree-element').append(link);
+              // link.text('x');
+              link.append('<i class="icon icon-trash"></i>');
+              $li.find('.jqtree-element .apos-reorganize-controls').append(link);
             }
           });
           $tree.on('click', '[data-visit]', function() {
