@@ -54,8 +54,21 @@
         <div class="apos-page-settings-toggle">
           <a data-show-edit-permissions href="#">{{ __('Who can edit this?') }}</a>
           <div class="apos-edit-permissions apos-page-settings-toggle-content">
-            {{ formSelective('editGroupIds', 'Groups', { propagate: true }) }}
-            {{ formSelective('editPersonIds', 'Individuals', { propagate: true }) }}
+            {% set options = { propagate: true } %}
+            {% if workflow %}
+              {% set options = {
+                propagate: true,
+                extras: [
+                  {
+                    name: 'publish',
+                    type: 'boolean',
+                    label: 'Can publish'
+                  }
+                ]
+              } %}
+            {% endif %}
+            {{ formSelective('editGroupIds', 'Groups', options) }}
+            {{ formSelective('editPersonIds', 'Individuals', options) }}
             {# This won't be true for some site somewhere, give it a class #}
             <p class="apos-edit-permissions-hint">{{ __('Admins can always edit everything.') }}</p>
           </div>

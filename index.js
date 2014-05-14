@@ -355,7 +355,7 @@ function pages(options, callback) {
                 // Populate slug and permissions correctly
                 req.extras[item] = page ? page : { slug: item };
                 if (!page) {
-                  apos.addPermissionsToPages(req, [req.extras[item]]);
+                  req.extras[item]._edit = true;
                 }
                 return callback(null);
               });
@@ -920,12 +920,13 @@ function pages(options, callback) {
       });
     }
     function permissions(callback) {
-      apos.permissions(req, 'manage-page', parent, function(err) {
-        if (err) {
-          return callback(err);
-        }
-        apos.permissions(req, 'manage-page', moved, callback);
-      });
+      if (!apos.permissions.can(req, 'publish-page', parent)) {
+        return callback('forbidden');
+      }
+      if (!apos.permissions.can(req, 'publish-page', moved)) {
+        return callback('forbidden');
+      }
+      return callback(null);
     }
     // This results in problems if the target is below us, and
     // it really doesn't matter if there are gaps between ranks. -Tom
@@ -1078,18 +1079,6 @@ function pages(options, callback) {
         return callback(err);
       }
       return callback(null, changed);
-    });
-  };
-
-  // Accepts page objects and filters them to those that the
-  // current user is permitted to view
-  self.filterByView = function(req, pages, callback) {
-    async.filter(pages, function(page, callback) {
-      return apos.permissions(req, 'view-page', page, function(err) {
-        return callback(!err);
-      });
-    }, function(pages) {
-      return callback(null, pages);
     });
   };
 
@@ -1313,11 +1302,10 @@ function pages(options, callback) {
     }
 
     function permissions(callback) {
-      return apos.permissions(req, 'edit-page', parent, function(err) {
-        // If there is no permissions error then note that we are cool
-        // enough to manage the page
-        return callback(err);
-      });
+      if (!apos.permissions.can(req, 'edit-page', parent)) {
+        return callback('forbidden');
+      }
+      return callback(null);
     }
 
     // TODO: there's a potential race condition here. It's not a huge deal,
@@ -1472,11 +1460,10 @@ function pages(options, callback) {
     }
 
     function permissions(callback) {
-      return apos.permissions(req, 'edit-page', page, function(err) {
-        // If there is no permissions error then we are cool
-        // enough to edit the page
-        return callback(err);
-      });
+      if (!apos.permissions.can(req, 'publish-page', page)) {
+        return callback('forbidden');
+      }
+      return callback(null);
     }
 
     function updatePage(callback) {
@@ -1768,8 +1755,8 @@ function pages(options, callback) {
     // Browser side javascript for search is not just for logged in people
     self.pushAsset('script', 'content', { when: 'always' });
     self.pushAsset('stylesheet', 'editor', { when: 'user' });
-    self.pushAsset('template', 'newPageSettings', { when: 'user' });
-    self.pushAsset('template', 'editPageSettings', { when: 'user' });
+    self.pushAsset('template', 'newPageSettings', { when: 'user', data: { publish: apos.options.workflow } });
+    self.pushAsset('template', 'editPageSettings', { when: 'user', data: { publish: apos.options.workflow } });
     self.pushAsset('template', 'reorganize', { when: 'user' });
     self.pushAsset('template', 'pageVersions', { when: 'user' });
 
@@ -1927,13 +1914,11 @@ function pages(options, callback) {
           res.statusCode = 404;
           return res.send(404);
         }
-        self.filterByView(req, [ page ], function(err, pages) {
-          if (err || (!pages.length)) {
-            res.statusCode = 404;
-            return res.send(404);
-          }
-          res.send(page);
-        });
+        if (err || (!apos.permissions.can(req, page, 'view-page'))) {
+          res.statusCode = 404;
+          return res.send(404);
+        }
+        return res.send(page);
       });
     });
 
@@ -2043,7 +2028,10 @@ function pages(options, callback) {
       }
 
       function permissions(callback) {
-        return apos.permissions(req, 'edit-page', page, callback);
+        if (!apos.permissions.can(req, 'publish-page', page)) {
+          return callback('forbidden');
+        }
+        return callback(null);
       }
 
       function findVersions(callback) {
@@ -2102,7 +2090,10 @@ function pages(options, callback) {
       }
 
       function permissions(callback) {
-        return apos.permissions(req, 'edit-page', page, callback);
+        if (!apos.permissions.can(req, 'publish-page', page)) {
+          return callback('forbidden');
+        }
+        return callback(null);
       }
 
       function findVersion(callback) {
