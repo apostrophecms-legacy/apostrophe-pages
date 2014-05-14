@@ -469,6 +469,7 @@ function AposPages() {
           $tree.tree({
             data: [],
             autoOpen: 1,
+            openFolderDelay: 1500,
             dragAndDrop: true,
             onCanMoveTo: function(moved_node, target_node, position) {
               // Cannot create peers of root
@@ -556,6 +557,7 @@ function AposPages() {
 
           $tree.on('tree.move', function(e) {
             e.preventDefault();
+            $el.find('.apos-reorganize-progress').fadeIn();
             var data = {
                 moved: e.move_info.moved_node.slug,
                 target: e.move_info.target_node.slug,
@@ -575,6 +577,7 @@ function AposPages() {
                   }
                 });
                 e.move_info.do_move();
+                $el.find('.apos-reorganize-progress').fadeOut();
               },
               error: function() {
                 // This didn't work, probably because something
