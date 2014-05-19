@@ -2086,17 +2086,8 @@ function pages(options, callback) {
       var searchFilters = [
         { name: 'page', label: 'Pages' }
       ];
-      var instanceTypesSeen = {};
-      _.each(self.types, function(type) {
-        if (type._instance && (type.searchable !== false)) {
-          if (!instanceTypesSeen[type._instance]) {
-            searchFilters.push({
-              name: type._instance,
-              label: type.pluralLabel
-            });
-          }
-        }
-      });
+      apos.emit('addSearchFilters', searchFilters);
+
       // Option to override or shut off with false
       if (options.searchFilters !== undefined) {
         searchFilters = options.searchFilters;
