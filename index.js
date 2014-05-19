@@ -1570,126 +1570,18 @@ function pages(options, callback) {
     });
   }
 
-  // Given a request object for a user with suitable permissions and a data object
-  // with loginRequired, loginRequiredPropagate, viewGroupIds, viewPersonIds,
-  // and (if the user is an admin) editGroupIds and editPersonIds arrays,
-  // apply those permissions to the page and (if loginRequiredPropagate is true)
-  // all of its descendants.
-  //
-  // The value of each entry in viewPersonIds and the other arrays must be EITHER:
-  //
-  // 1. A simple array of person or group IDs, or:
-  //
-  // 2. An object with `value`, `propagate`, and `removed` properties. The `value`
-  // property must be the id of the person or group. The `propagate` property
-  // indicates that we wish to propagate this change to descendant pages.
-  // The `removed` property indicates that we have chosen to remove this id
-  // rather than add it.
-  //
-  // If you choose option #1, changes are NOT propagated to child pages.
-  //
-  // This method does NOT actually save the page object, although it DOES modify
-  // any descendant pages. It is YOUR responsibility to save the page object
-  // afterwards, usually via putPage.
-  //
-  // data is usually req.body, however it is convenient to call this method from
-  // tasks as well.
-
+  // Invoke apos.permissions.apply to propagate our permissions
+  // choices and prepare them for saving in this page object as well.
   self.applyPermissions = function(req, data, page, callback) {
-    var fields = [ 'viewGroupIds', 'viewPersonIds' ];
-
-    // Only admins can change editing permissions.
-    //
-    // TODO I should be checking this as a named permission in its own right
-
-    var userPermissions = req.user && req.user.permissions;
-    if (userPermissions.admin) {
-      fields = fields.concat([ 'editGroupIds', 'editPersonIds' ]);
-    }
-
-    var propagatePull;
-    var propagateAdd;
-    var propagateSet;
-    var propagateUnset;
-    var loginRequired = apos.sanitizeSelect(data.loginRequired, [ '', 'loginRequired', 'certainPeople' ], '');
-    if (loginRequired === '') {
-      delete page.loginRequired;
-    } else {
-      page.loginRequired = loginRequired;
-    }
-    if (apos.sanitizeBoolean(data.loginRequiredPropagate)) {
-      if (loginRequired !== '') {
-        propagateSet = { loginRequired: loginRequired };
-      } else {
-        propagateUnset = { loginRequired: 1 };
-      }
-    }
-    _.each(fields, function(field) {
-      page[field] = [];
-      _.each(data[field], function(datum) {
-        if (typeof(datum) !== 'object') {
-          if (typeof(datum === 'string')) {
-            datum = {
-              value: datum,
-              propagate: false,
-              removed: false
-            };
-          } else {
-            return;
-          }
-        }
-
-        var removed = apos.sanitizeBoolean(datum.removed);
-        var propagate = apos.sanitizeBoolean(datum.propagate);
-        if (removed) {
-          if (propagate) {
-            if (!propagatePull) {
-              propagatePull = {};
-            }
-            if (!propagatePull[field]) {
-              propagatePull[field] = [];
-            }
-            propagatePull[field].push(datum.value);
-          }
-        } else {
-          if (propagate) {
-            if (!propagateAdd) {
-              propagateAdd = {};
-            }
-            if (!propagateAdd[field]) {
-              propagateAdd[field] = [];
-            }
-            propagateAdd[field].push(datum.value);
-          }
-          page[field].push(datum.value);
-          page.certainPeople = true;
-        }
-      });
-    });
-    if (propagatePull || propagateAdd || propagateSet || propagateUnset) {
-      var command = {};
-      if (propagatePull) {
-        command.$pull = { };
-        _.each(propagatePull, function(values, field) {
-          command.$pull[field] = { $in: values };
-        });
-      }
-      if (propagateAdd) {
-        command.$addToSet = { };
-        _.each(propagateAdd, function(values, field) {
-          command.$addToSet[field] = { $each: values };
-        });
-      }
-      if (propagateSet) {
-        command.$set = propagateSet;
-      }
-      if (propagateUnset) {
-        command.$unset = propagateUnset;
-      }
-      return apos.pages.update({ path: new RegExp('^' + RegExp.quote(page.path) + '/') }, command, { multi: true }, callback);
-    } else {
-      return callback(null);
-    }
+    return apos.permissions.apply(
+      req,
+      data,
+      page,
+      // Use _.bind to wrap apos.pages.update so that its first
+      // argument is pre-filled to be criteria that match descendants
+      // of this page
+      _.bind(apos.pages.update, apos.pages, { path: new RegExp('^' + RegExp.quote(page.path) + '/') }),
+      callback);
   };
 
   if (options.ui) {
@@ -1755,8 +1647,9 @@ function pages(options, callback) {
     // Browser side javascript for search is not just for logged in people
     self.pushAsset('script', 'content', { when: 'always' });
     self.pushAsset('stylesheet', 'editor', { when: 'user' });
-    self.pushAsset('template', 'newPageSettings', { when: 'user', data: { publish: apos.options.workflow } });
-    self.pushAsset('template', 'editPageSettings', { when: 'user', data: { publish: apos.options.workflow } });
+    self.pushAsset('template', 'newPageSettings', { when: 'user', data: { workflow: apos.options.workflow } });
+    self.pushAsset('template', 'editPageSettings', { when: 'user', data: { workflow: apos.options.workflow } });
+    self.pushAsset('stylesheet', 'reorganize', { when: 'user' });
     self.pushAsset('template', 'reorganize', { when: 'user' });
     self.pushAsset('template', 'pageVersions', { when: 'user' });
 

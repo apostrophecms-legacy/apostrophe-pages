@@ -6,3 +6,6 @@
 {% block slug %}
   {{ formText('slug', 'Slug') }}
 {% endblock %}
+{% block permissionsEditor %}
+  {{ permissionsEditor({ propagate: true, workflow: workflow }) }}
+{% endblock %}

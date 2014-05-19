@@ -1312,7 +1312,7 @@ limitations under the License.
         }
         class_string = li_classes.join(' ');
         escaped_name = escapeIfNecessary(node.name);
-        return $("<li class=\"" + class_string + "\"><div class=\"jqtree-element jqtree_common\"><span class=\"jqtree-title jqtree_common\">" + escaped_name + "</span></div></li>");
+        return $("<li class=\"" + class_string + "\"><div class=\"jqtree-element-wrapper\"><div class=\"jqtree-element jqtree_common\"><span class=\"jqtree-title jqtree_common\">" + escaped_name + "</span></div></div></li>");
       };
       createFolderLi = function(node) {
         var button_char, button_classes, escaped_name, folder_classes, getButtonClasses, getFolderClasses;
@@ -1343,7 +1343,7 @@ limitations under the License.
         } else {
           button_char = _this.options.closedIcon;
         }
-        return $("<li class=\"jqtree_common " + folder_classes + "\"><div class=\"jqtree-element jqtree_common\"><a class=\"jqtree_common " + button_classes + "\">" + button_char + "</a><span class=\"jqtree_common jqtree-title\">" + escaped_name + "</span></div></li>");
+        return $("<li class=\"jqtree_common " + folder_classes + "\"><div class=\"jqtree-element-wrapper\"><div class=\"jqtree-element jqtree_common\"><a class=\"jqtree_common " + button_classes + "\"></a><span class=\"jqtree_common jqtree-title\">" + escaped_name + "</span></div></div></li>");
       };
       doCreateDomElements = function($element, children, is_root_node, is_open) {
         var $li, $ul, child, _i, _len;
@@ -2277,7 +2277,7 @@ limitations under the License.
     function DragElement(node, offset_x, offset_y, $tree) {
       this.offset_x = offset_x;
       this.offset_y = offset_y;
-      this.$element = $("<span class=\"jqtree-title jqtree-dragging\">" + node.name + "</span>");
+      this.$element = $("<div class=\"jqtree-element-wrapper jqtree-element-wrapper-being-dragged\"><div class=\"jqtree-element jqtree_common\"><span class=\"jqtree-title jqtree-dragging\">" + node.name + "</span><span class=\"apos-reorganize-controls\"><a class=\"apos-visit\"><i class=\"icon icon-external-link\"></i></a><a class=\"apos-delete\"><i class=\"icon icon-trash\"></i></a></span></div></div>");
       this.$element.css("position", "absolute");
       $tree.append(this.$element);
     }

@@ -137,7 +137,7 @@ function AposPages() {
 
               // $el.findByName('published').val(apos.data.pages.parent.published)
               // Copy parent permissions
-              enablePermissions(apos.data.aposPages.page);
+              enablePermissions(apos.data.aposPages.page, true);
               if (options.title) {
                 $el.find('[data-title]').text(options.title);
               }
@@ -186,7 +186,7 @@ function AposPages() {
               apos.enableTags($el.find('[data-name="tags"]'), defaults.tags);
 
               refreshType(function() {
-                enablePermissions(defaults);
+                enablePermissions(defaults, false);
 
                 // Watch the title for changes, update the slug - but only if
                 // the slug was in sync with the title to start with
@@ -331,14 +331,7 @@ function AposPages() {
           tags: $el.find('[data-name="tags"]').selective('get', { incomplete: true })
         };
 
-        // Permissions are fancy! But the server does most of the hard work
-        data.loginRequired = $el.findByName('loginRequired').val();
-        data.loginRequiredPropagate = $el.findByName('loginRequiredPropagate').is(':checked') ? '1' : '0';
-        // "certain people" (specific users/groups)
-        data.viewGroupIds = $el.find('[data-name="viewGroupIds"]').selective('get', { incomplete: true });
-        data.viewPersonIds = $el.find('[data-name="viewPersonIds"]').selective('get', { incomplete: true });
-        data.editGroupIds = $el.find('[data-name="editGroupIds"]').selective('get', { incomplete: true });
-        data.editPersonIds = $el.find('[data-name="editPersonIds"]').selective('get', { incomplete: true });
+        apos.permissions.debrief($el.find('[data-edit-permissions-container]'), data, { propagate: (action === 'edit') });
 
         _.extend(data, { parent: options.parent, originalSlug: options.slug });
 
@@ -395,68 +388,8 @@ function AposPages() {
         return false;
       }
 
-      function enablePermissions(page) {
-        // Admin users can't manipulate edit permissions. (Hackers could try, but the server
-        // ignores anything submitted.)
-
-        if (!apos.data.permissions.admin) {
-          $el.find('[data-edit-permissions-container]').hide();
-        }
-
-        $el.find('[data-show-view-permissions]').click(function() {
-          $(this).closest('.apos-page-settings-toggle').toggleClass('apos-active');
-          $el.find('.apos-view-permissions').toggle();
-          return false;
-        });
-
-        var $loginRequired = $el.findByName('loginRequired');
-        $loginRequired.val(page.loginRequired);
-        $loginRequired.change(function() {
-          var $certainPeople = $el.find('.apos-view-certain-people');
-          if ($(this).val() == 'certainPeople') {
-            $certainPeople.show();
-          } else {
-            $certainPeople.hide();
-          }
-        }).trigger('change');
-
-        $el.find('[data-show-edit-permissions]').click(function() {
-          $(this).closest('.apos-page-settings-toggle').toggleClass('apos-active');
-          $el.find('.apos-edit-permissions').toggle();
-          return false;
-        });
-
-        // TODO this is a hardcoded dependency on the people and
-        // groups modules, think about whether that is acceptable
-
-        $el.find('[data-name="viewGroupIds"]').selective({
-          // Unpublished people and groups can still have permissions
-          source: '/apos-groups/autocomplete?published=any',
-          data: page.viewGroupIds || [],
-          propagate: true,
-          preventDuplicates: true
-        });
-
-        $el.find('[data-name="viewPersonIds"]').selective({
-          source: '/apos-people/autocomplete?published=any',
-          data: page.viewPersonIds || [],
-          propagate: true,
-          preventDuplicates: true
-        });
-
-        $el.find('[data-name="editGroupIds"]').selective({
-          source: '/apos-groups/autocomplete?published=any',
-          data: page.editGroupIds || [],
-          propagate: true,
-          preventDuplicates: true
-        });
-
-        $el.find('[data-name="editPersonIds"]').selective({
-          source: '/apos-people/autocomplete?published=any',
-          data: page.editPersonIds || [],
-          propagate: true,
-          preventDuplicates: true
-        });
+      function enablePermissions(page, isNew) {
+        apos.permissions.brief($el.find('[data-permissions]'), page, { propagate: !isNew });
       }
 
     })();
@@ -469,6 +402,7 @@ function AposPages() {
           $tree.tree({
             data: [],
             autoOpen: 1,
+            openFolderDelay: 1500,
             dragAndDrop: true,
             onCanMoveTo: function(moved_node, target_node, position) {
               // Cannot create peers of root
@@ -484,21 +418,24 @@ function AposPages() {
               if (node.slug == '/trash') {
                 $li.addClass('apos-trash');
               }
+              $li.find('.jqtree-element').append($('<span class="apos-reorganize-controls"></span>'))
               // Append a link to the jqtree-element div.
               // The link has a url '#node-[id]' and a data property 'node-id'.
               var link = $('<a class="apos-visit"></a>');
               link.attr('data-node-id', node.id);
               link.attr('data-visit', '1');
               link.attr('href', '#');
-              link.text('»');
-              $li.find('.jqtree-element').append(link);
+              // link.text('»');
+              link.append('<i class="icon icon-external-link"></i>');
+              $li.find('.jqtree-element .apos-reorganize-controls').append(link);
 
               link = $('<a class="apos-delete"></a>');
               link.attr('data-node-id', node.id);
               link.attr('data-delete', '1');
               link.attr('href', '#');
-              link.text('x');
-              $li.find('.jqtree-element').append(link);
+              // link.text('x');
+              link.append('<i class="icon icon-trash"></i>');
+              $li.find('.jqtree-element .apos-reorganize-controls').append(link);
             }
           });
           $tree.on('click', '[data-visit]', function() {
@@ -553,6 +490,7 @@ function AposPages() {
 
           $tree.on('tree.move', function(e) {
             e.preventDefault();
+            $el.find('.apos-reorganize-progress').fadeIn();
             var data = {
                 moved: e.move_info.moved_node.slug,
                 target: e.move_info.target_node.slug,
@@ -572,6 +510,7 @@ function AposPages() {
                   }
                 });
                 e.move_info.do_move();
+                $el.find('.apos-reorganize-progress').fadeOut();
               },
               error: function() {
                 // This didn't work, probably because something
