@@ -15,6 +15,7 @@ function pages(options, callback) {
   var self = this;
   var aposPages = this;
   self._action = '/apos-pages';
+  self._apos = apos;
 
   // Usage: app.get('*', pages.serve({ typePath: __dirname + '/views/pages' }))
   //
@@ -2058,110 +2059,6 @@ function pages(options, callback) {
             info.id = info._id;
           });
           return res.send({status: 'ok', changed: changed });
-        }
-      });
-    });
-
-    // pages.searchLoader is a loader function. If the page type is 'search',
-    // it'll kick in and make search results available in req.extras.search.
-    // You enable this by specifying it when you set your loader option in
-    // calling pages.serve. Include a form on the page template with itself as
-    // the action so you can make queries. (Confused? See the sandbox for
-    // an example.)
-
-    self.searchLoader = function(req, callback) {
-      if (!req.page) {
-        // We're only interested in exact matches, /search/something is
-        // none of our business, we don't look at req.bestPage
-        return callback(null);
-      }
-      // We're only interested in enhancing pages of type "search"
-      if (req.page.type !== 'search') {
-        return callback(null);
-      }
-
-      // Build search filters by type. The default filter offers
-      // "Page" and all of the snippet instance types that are searchable.
-      // Anything that isn't one of the latter is toggled by "Page"
-      var searchFilters = [
-        { name: 'page', label: 'Pages' }
-      ];
-      apos.emit('addSearchFilters', searchFilters);
-
-      // Option to override or shut off with false
-      if (options.searchFilters !== undefined) {
-        searchFilters = options.searchFilters;
-      }
-      req.extras.searchFilters = searchFilters;
-
-      var q = apos.sanitizeString(req.query.q);
-      req.extras.q = q;
-
-      var resultGroups = [];
-      var query = {};
-      apos.emit('addSearchCriteria', req, query);
-
-      var sort;
-      if ((!req.query.sort) || (req.query.sort === 'quality')) {
-        sort = 'q';
-      } else {
-        // Chronological sort
-        sort = { start: -1, publishedAt: -1, createdAt: -1 };
-      }
-
-      return apos.get(req, query, { fields: { title: 1, slug: 1, type: 1, searchSummary: 1, lowSearchText: 1, publishedAt: 1, startDate: 1, startTime: 1, start: 1, endDate: 1, endTime: 1, end: 1 }, limit: 100, q: q, sort: sort }, function(err, results) {
-        if (err) {
-          console.error(err);
-          req.statusCode = 500;
-          return callback(null);
-        }
-        req.extras.search = _.filter(results.pages, function(result) {
-          return suitable(result);
-        });
-        return callback(null);
-      });
-
-      // Vetoes anything belonging to a snippets module that has
-      // specifically declared itself unsearchable
-      function suitable(page) {
-        var s = { page: page, suitable: true };
-        apos.emit('searchable', s);
-        if (!s.suitable) {
-          return false;
-        }
-        return true;
-      }
-      return async.series([find], finish);
-    };
-
-    // Given a slug that was returned as a search result, generate a redirect
-    // to the appropriate place. The idea is that doing this when users actually
-    // click is much cheaper than determining the perfect URL for every search
-    // result in the list, most of which will never be clicked on
-
-    app.get(self._action + '/search-result', function(req, res) {
-      var slug = req.query.slug;
-      return apos.getPage(req, slug, function(err, page) {
-        if (!page) {
-          res.statusCode = 404;
-          return res.send('Not Found');
-        }
-        if (page.slug.match(/\//)) {
-          // TODO this is another place we are hardcoding the root, it is
-          // increasingly clear we don't support more than one root right now
-          return res.redirect(page.slug);
-        } else {
-          // we don't know what to do with this kind of page, but
-          // another module might; emit an event
-          var context = {};
-          apos.emit('searchResult', req, res, page, context);
-          if (!context.accepted) {
-            // No one will admit to knowing what to do with this page
-            res.statusCode = 404;
-            return res.send('Not Found');
-          } else {
-            // Someone else is asynchronously dealing with it, we're good here
-          }
         }
       });
     });
