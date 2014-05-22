@@ -1808,7 +1808,7 @@ function pages(options, callback) {
           res.statusCode = 404;
           return res.send(404);
         }
-        if (err || (!apos.permissions.can(req, page, 'view-page'))) {
+        if (err || (!apos.permissions.can(req, 'view-page', page))) {
           res.statusCode = 404;
           return res.send(404);
         }
