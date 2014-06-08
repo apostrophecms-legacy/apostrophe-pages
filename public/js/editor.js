@@ -331,7 +331,7 @@ function AposPages() {
           tags: $el.find('[data-name="tags"]').selective('get', { incomplete: true })
         };
 
-        apos.permissions.debrief($el.find('[data-edit-permissions-container]'), data, { propagate: (action === 'edit') });
+        apos.permissions.debrief($el.find('[data-permissions]'), data, { propagate: (action === 'edit') });
 
         _.extend(data, { parent: options.parent, originalSlug: options.slug });
 

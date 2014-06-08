@@ -1240,8 +1240,8 @@ function pages(options, callback) {
   // Insert a page. The req argument is examined for permissions purposes.
   //
   // The data argument is consulted for title, parent (slug of parent page),
-  // published, tags, type, seoDescription, viewGroupIds, editGroupIds,
-  // viewPersonIds and editGroupIds fields, which are validated here.
+  // published, tags, type, seoDescription, and pagePermissions fields,
+  // which are validated here.
   //
   // All other fields are validated via the sanitizer for
   // the current page type, except that fields with the "type: area" property
@@ -1326,15 +1326,6 @@ function pages(options, callback) {
 
     function insertPage(callback) {
       page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
-
-      // Permissions initially match those of the parent
-      page.viewGroupIds = parent.viewGroupIds;
-      page.viewPersonIds = parent.viewPersonIds;
-      page.editGroupIds = parent.editGroupIds;
-      page.editPersonIds = parent.editPersonIds;
-      if (parent.loginRequired) {
-        page.loginRequired = parent.loginRequired;
-      }
 
       return async.series({
         applyPermissions: function(callback) {
