@@ -3,33 +3,54 @@
 
 <div class="apos-page-settings apos-modal apos-ui apos-template {% block class %}apos-new-page-settings{% endblock %}">
   <h3 class="apos-modal-title"><span data-title>{% block action %}{{ __('New Page') }}{% endblock %}</span></h3>
+  
   <div class="apos-modal-controls">
     <a href="#" data-save class="apos-button apos-edit-modal apos-button-red">{{ __('Save') }}</a>
     <a href="#" data-cancel class="apos-button apos-edit-modal apos-button-white apos-button-arrow-left ">{{ __('Cancel') }}</a>
   </div>
+
   <div class="apos-modal-body">
     <form>
-      {{ formText('title', 'Title') }}
-      {# JS will populate it #}
-      {{ formSelect('type', 'Type', []) }}
-      {{ formBoolean('published', 'Published') }}
-      {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
 
-      {# Must contain the entirety of the permissions editor for js. -Tom #}
-      <div data-permissions>
-        {% block permissionsEditor %}
-          {{ permissionsEditor({ propagate: false, workflow: workflow }) }}
-        {% endblock %}
+    {{ formText('title', 'Title') }}
+    {# JS will populate it #}
+    {{ formSelect('type', 'Type', []) }}
+
+    <div class="apos-modal-tabs">
+      <div class="apos-modal-tab-control">
+        <div class="apos-modal-tab-title apos-active" data-tab="groupSettings">
+          Settings
+        </div>
+        <div class="apos-modal-tab-title" data-tab="groupPermissions">
+          Permissions
+        </div>
       </div>
 
-      {{ formBoolean('notOrphan', 'Show in Navigation') }}
-      {# We don't allow the slug to be edited for a brand new post, #}
-      {# but provide a block the edit template can override #}
-      {% block slug %}
-      {% endblock %}
-      {{ formTags('tags', 'Tags') }}
-      {# js populates this as needed, for instance blog pages have extra settings #}
-      <div data-type-details></div>
+      <div class="apos-modal-tab apos-active" data-tab-id="groupSettings">
+        <div class="apos-modal-tab-content">
+          {{ formBoolean('published', 'Published') }}
+          {{ formBoolean('notOrphan', 'Show in Navigation') }}
+          {% block slug %}
+          {% endblock %}
+          {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
+          {{ formTags('tags', 'Tags') }}
+          <div data-type-details></div>
+        </div>
+      </div>
+
+      <div class="apos-modal-tab" data-tab-id="groupPermissions">
+        <div class="apos-modal-tab-content">
+          {# Must contain the entirety of the permissions editor for js. -Tom #}
+          <div data-permissions>
+            {% block permissionsEditor %}
+              {{ permissionsEditor({ propagate: false, workflow: workflow }) }}
+            {% endblock %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
     </form>
   </div>
 </div>
