@@ -1014,7 +1014,7 @@ function pages(options, callback) {
       if (_.isEmpty(action)) {
         return setImmediate(callback);
       }
-      return apos.pages.update({ path: matchParentPathPrefix }, action, callback);
+      return apos.pages.update({ path: matchParentPathPrefix }, action, { multi: true }, callback);
     }
     function finish(err) {
       if (err) {
