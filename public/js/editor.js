@@ -152,7 +152,7 @@ function AposPages() {
         return $el;
       };
 
-      $('body').on('click', '.apos-edit-page', function() {
+      $('body').on('click', '[data-edit-page]', function() {
         var slug = apos.data.aposPages.page.slug;
 
         // Get a more robust JSON representation that includes

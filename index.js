@@ -1304,6 +1304,10 @@ function pages(options, callback) {
     }
 
     function permissions(callback) {
+      if (!apos.permissions.can(req, 'publish-page', parent)) {
+        // I can create a child page but I can't publish it
+        published = false;
+      }
       if (!apos.permissions.can(req, 'edit-page', parent)) {
         return callback('forbidden');
       }
