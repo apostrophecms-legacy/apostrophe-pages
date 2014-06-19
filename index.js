@@ -155,9 +155,10 @@ function pages(options, callback) {
 
       function time(fn, name) {
         return function(callback) {
+          // console.log(name + ' {');
           var start = now();
           return fn(function(err) {
-            // console.log(name + ': ' + (now() - start));
+            // console.log('} ' + (now() - start));
             return callback(err);
           });
         };
