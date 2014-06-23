@@ -1,11 +1,60 @@
+{% extends 'baseModal.html' %}
+{% include 'uiMacros.html' %}
 {% include 'formMacros.html' %}
-{% extends 'newPageSettings.html' %}
+{% include 'permissionsMacros.html' %}
 
-{% block class %}apos-edit-page-settings{% endblock %}
-{% block action %}{{ __('Edit Page') }}{% endblock %}
-{% block slug %}
-  {{ formText('slug', 'Slug') }}
+{% block modalClass %}
+  apos-edit-page-settings apos-ui-modal-no-sidebar apos-ui-modal-has-tabs
+{% endblock%}
+
+{% block modalControls %} 
+  {{ renderProgressBtn({dataAttrs: 'data-save', float: 'right', color: 'base', label: 'Save'}) }}
+  {{ renderProgressBtn({dataAttrs: 'data-cancel', float: 'left', label: 'Cancel'}) }}
 {% endblock %}
-{% block permissionsEditor %}
-  {{ permissionsEditor({ propagate: true, workflow: workflow }) }}
+
+{% block modalLabel %}
+  {{ __('Edit Page') }}
+{% endblock %}
+
+{% block modalBody %}
+  <form>
+    {{ formText('title', 'Title') }}
+    {# JS will populate it #}
+    <div class="apos-modal-tabs">
+      <div class="apos-modal-tab-control">
+        <div class="apos-modal-tab-title apos-active" data-tab="groupSettings">
+          Settings
+        </div>
+        <div class="apos-modal-tab-title" data-tab="groupPermissions">
+          Permissions
+        </div>
+      </div>
+
+      <div class="apos-modal-tab apos-active" data-tab-id="groupSettings">
+        <div class="apos-modal-tab-content">
+          {{ formText('slug', 'Slug') }}
+          {{ formSelect('type', 'Type', []) }}
+          {{ formBoolean('published', 'Published') }}
+          {{ formBoolean('notOrphan', 'Show in Navigation') }}
+          {% block slug %}
+          {% endblock %}
+          {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
+          {{ formTags('tags', 'Tags') }}
+          <div data-type-details></div>
+        </div>
+      </div>
+
+      <div class="apos-modal-tab" data-tab-id="groupPermissions">
+        <div class="apos-modal-tab-content">
+          {# Must contain the entirety of the permissions editor for js. -Tom #}
+          <div data-permissions>
+            {% block permissionsEditor %}
+              {{ permissionsEditor({ propagate: false, workflow: workflow }) }}
+            {% endblock %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </form>
 {% endblock %}

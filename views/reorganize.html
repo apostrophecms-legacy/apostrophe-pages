@@ -1,29 +1,33 @@
-<div class="apos-modal apos-template apos-ui apos-reorganize-page">
-  <h3 class="apos-modal-title">{{ __('Reorganize Pages') }}</h3>
-  <div class="apos-modal-controls">
-    <a href="#" data-action="dismiss" class="apos-control apos-button apos-edit-modal apos-cancel apos-button-red">Finished</a>
-  </div>
-  {% block topButtons %}
-  <p class="apos-instructions">{{ __('Drag and drop pages wherever they need to go.') }}</p>
-  {# Makes more sense in edit view #}
-  {# {{ snippetNewControls() }} #}
-  {% endblock %}
-  <div class="apos-modal-body">
-    <div class="apos-modal-tabs">
-      <div class="apos-modal-tab-control">
-        <div class="apos-modal-tab-title apos-active" data-tab="reorganize"><i class="icon-list"></i> Reorganize</div>
+{% extends 'baseModal.html' %}
+{% include 'uiMacros.html' %}
+
+{% block modalClass %}
+  apos-reorganize-page
+{% endblock%}
+
+{% block modalControls %} 
+  {{ renderProgressBtn({dataAttrs: 'data-cancel', float: 'right', color: 'base', label: 'Finished'}) }}
+{% endblock %}
+
+{% block modalLabel %}
+  {{ __('Reorganize Pages') }}
+{% endblock %}
+
+{% block modalInstructions %}
+  <p>
+    {{ __('Drag and drop pages wherever they need to go.') }}
+  </p>
+{% endblock %}
+
+{% block modalBody %}
+  <div class="apos-modal-tab apos-active" data-tab-id="reorganize" >
+    <div class="apos-modal-tab-content">
+      {# This gets fired up by jstree #}
+      <div class="apos-reorganize-tree" data-tree>
       </div>
-      <div class="apos-modal-tab apos-active" data-tab-id="reorganize" >
-        <div class="apos-modal-tab-content">
-          {# This gets fired up by jstree #}
-          <div class="apos-reorganize-tree" data-tree>
-          </div>
-          <div class="apos-reorganize-progress">
-            {% include "progress.html" %}
-          </div>
-        </div>
+      <div class="apos-reorganize-progress">
+        {% include "progress.html" %}
       </div>
     </div>
-
   </div>
-</div>
+{% endblock %}

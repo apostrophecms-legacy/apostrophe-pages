@@ -1,13 +1,27 @@
-<div class="apos-versions-page apos-modal apos-template">
-  <h3>{{ __('Versions') }}</h3>
-  <div class="apos-modal-body">
-    <p>{{ __('Click on any version to switch back.') }}</p>
-    <form>
-      <div class="apos-versions" data-versions>
-      </div>
-    </form>
-  </div>
-  <div class="apos-modal-footer">
-    <a href="#" data-action="dismiss" class="apos-control apos-button apos-cancel">{{ __('Done') }}</a>
-  </div>
-</div>
+{% extends 'baseModal.html' %}
+{% include 'uiMacros.html' %}
+
+{% block modalClass %}
+  apos-versions-page apos-ui-modal-no-sidebar apos-ui-modal-has-tabs
+{% endblock%}
+
+{% block modalControls %} 
+  {{ renderProgressBtn({dataAttrs: 'data-cancel', float: 'right', color: 'base', label: 'Done'}) }}
+{% endblock %}
+
+{% block modalLabel %}
+  {{ __('Versions') }}
+{% endblock %}
+
+{% block modalInstructions %}
+  <p>
+    {{ __('Click on any version to switch back.') }}
+  </p>
+{% endblock %}
+
+{% block modalBody %}
+  <form>
+    <div class="apos-versions" data-versions>
+    </div>
+  </form>
+{% endblock %}
