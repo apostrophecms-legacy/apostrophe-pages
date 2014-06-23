@@ -1275,7 +1275,7 @@ function pages(options, callback) {
     seoDescription = apos.sanitizeString(data.seoDescription).trim();
 
     published = apos.sanitizeBoolean(data.published, true);
-    orphan = apos.sanitizeBoolean(req.body.orphan, false);
+    orphan = apos.sanitizeBoolean(data.orphan, false);
 
     tags = apos.sanitizeTags(data.tags);
     type = determineType(data.type);
