@@ -49,7 +49,7 @@
           {# Must contain the entirety of the permissions editor for js. -Tom #}
           <div data-permissions>
             {% block permissionsEditor %}
-              {{ permissionsEditor({ propagate: false, workflow: workflow }) }}
+              {{ permissionsEditor({ propagate: true, workflow: workflow }) }}
             {% endblock %}
           </div>
         </div>
