@@ -184,7 +184,6 @@ function AposPages() {
               $seoDescription.val(defaults.seoDescription || '');
               $el.find('[name=slug]').val(slug);
               apos.enableTags($el.find('[data-name="tags"]'), defaults.tags);
-
               refreshType(function() {
                 enablePermissions(defaults, false);
 
@@ -248,6 +247,17 @@ function AposPages() {
           type = _.find(apos.data.aposPages.types, function(type) {
             return (type.name === presetType);
           });
+          if (!type) {
+            // Even a type not configured in app.js might still be
+            // around as a page template; some people remove
+            // "home" from the types option for instance so nobody
+            // adds a second "home"
+            type = {
+              label: presetType,
+              name: presetType
+            };
+            apos.data.aposPages.types.push(type);
+          }
           if (type) {
             $type.html('');
             $option = $('<option></option>');
@@ -283,7 +293,6 @@ function AposPages() {
         if (oldTypeName) {
           $el.find('[data-type-details]').html('');
         }
-
         var type = aposPages.getType(typeName);
         if (type.orphan) {
           // Locked for this type
