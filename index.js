@@ -1285,12 +1285,25 @@ function pages(options, callback) {
       orphan = true;
     }
 
-    return async.series([ getParent, permissions, getNextRank, insertPage ], function(err) {
+    return async.series([ allowedTags, getParent, permissions, getNextRank, insertPage ], function(err) {
       if (err) {
         return callback(err);
       }
       return callback(null, page);
     });
+
+    function allowedTags(callback) {
+      if (!self._apos.options.lockTags) {
+        return setImmediate(callback);
+      }
+      return self._apos.getTags({ tags: tags }, function(err, _tags) {
+        if (err) {
+          return callback(err);
+        }
+        tags = _tags;
+        return callback(null);
+      });
+    }
 
     function getParent(callback) {
       parentSlug = data.parent;
@@ -1443,7 +1456,20 @@ function pages(options, callback) {
       slug = '/';
     }
 
-    async.series([ getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
+    async.series([ allowedTags, getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
+
+    function allowedTags(callback) {
+      if (!self._apos.options.lockTags) {
+        return setImmediate(callback);
+      }
+      return self._apos.getTags({ tags: tags }, function(err, _tags) {
+        if (err) {
+          return callback(err);
+        }
+        tags = _tags;
+        return callback(null);
+      });
+    }
 
     function getPage(callback) {
       return apos.getPage(req, originalSlug, function(err, pageArg) {
