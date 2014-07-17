@@ -410,7 +410,7 @@ function AposPages() {
           $tree = $el.find('[data-tree]');
           $tree.tree({
             data: [],
-            autoOpen: 1,
+            autoOpen: 0,
             openFolderDelay: 1500,
             dragAndDrop: true,
             onCanMoveTo: function(moved_node, target_node, position) {
@@ -638,4 +638,3 @@ function AposPages() {
 // There is only one instance of AposPages. TODO: provide
 // for substituting a subclass
 window.aposPages = new AposPages();
-
