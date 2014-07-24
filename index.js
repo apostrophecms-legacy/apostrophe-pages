@@ -500,12 +500,31 @@ function pages(options, callback) {
             {
               name: 'delete-page',
               label: 'Move to Trash'
-            },
-            {
-              name: 'reorganize-page',
-              label: 'Reorganize'
             }
           ];
+        }
+        // only admins get the Reorganize menu
+        if (args.contextMenu && req.user && req.user.permissions && req.user.permissions.admin) {
+
+          var reorgItem = _.find(args.contextMenu, function(item) {
+            return item.name === 'reorganize-page';
+          });
+
+          if(!reorgItem) {
+            args.contextMenu.push({
+              name: 'reorganize-page',
+              label: 'Reorganize'
+            });
+          }
+        }
+
+        else if(args.contextMenu && req.user) {
+          // This user does NOT have permission to see reorg,
+          // but it might exist already in the contextMenu (why??),
+          // so we have to remove it explicitly.
+          args.contextMenu = _.filter(args.contextMenu, function(item) {
+            return item.name !== 'reorganize-page';
+          });
         }
 
         _.extend(args, req.extras);
