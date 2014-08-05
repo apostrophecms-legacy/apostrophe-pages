@@ -185,9 +185,23 @@ function pages(options, callback) {
       function page(callback) {
         // Get content for this page
         req.slug = req.params[0];
+
+        // Fix common screwups in URLs: leading/trailing whitespace,
+        // presence of trailing slashes (but always restore the
+        // leading slash). Express leaves escape codes uninterpreted
+        // in the path, so look for %20, not ' '.
+        req.slug = req.slug.trim();
+        req.slug = req.slug.replace(/\/+$/, '');
         if ((!req.slug.length) || (req.slug.charAt(0) !== '/')) {
           req.slug = '/' + req.slug;
         }
+
+        // Had to change the URL, so redirect to it. TODO: this
+        // contains an assumption that we are mounted at /
+        if (req.slug !== req.params[0]) {
+          return res.redirect(req.slug);
+        }
+
         apos.getPage(req, req.slug, function(e, page, bestPage, remainder) {
           if (e) {
             return callback(e);
