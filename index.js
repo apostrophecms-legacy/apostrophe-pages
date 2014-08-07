@@ -1830,7 +1830,7 @@ function pages(options, callback) {
             type: page.type,
             // Also nice for icons and browser-side decisions about what's draggable where
             trash: page.trash,
-            publish: apos.permissions.can(req, 'publish-page', page),
+            publish: (page.path === 'home/trash') || apos.permissions.can(req, 'publish-page', page),
             edit: apos.permissions.can(req, 'edit-page', page)
           };
           if (page.children && page.children.length) {
