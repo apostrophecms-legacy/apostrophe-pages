@@ -2203,9 +2203,12 @@ limitations under the License.
     };
 
     DragAndDropHandler.prototype.mustOpenFolderTimer = function(area) {
-      var node;
-      node = area.node;
-      return node.isFolder() && !node.is_open && area.position === Position.INSIDE;
+      // Workaround for: https://github.com/mbraak/jqTree/issues/291
+      // No folders popping open on drag for us. -Tom
+      return false;
+      // var node;
+      // node = area.node;
+      // return node.isFolder() && !node.is_open && area.position === Position.INSIDE;
     };
 
     DragAndDropHandler.prototype.updateDropHint = function() {

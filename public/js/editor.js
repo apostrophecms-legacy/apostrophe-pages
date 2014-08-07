@@ -524,12 +524,14 @@ function AposPages() {
                 $el.find('.apos-reorganize-progress').fadeOut();
               },
               error: function() {
-                // This didn't work, probably because something
-                // else has changed in the page tree, or because
-                // we're not cool enough to do it. Refreshing
-                // is an appropriate response
-                apos.afterYield(function() { reload(null); });
-                $el.find('.apos-reorganize-progress').fadeOut();
+
+                alert('You may only move pages you are allowed to publish. If you move a page to a new parent, you must be allowed to edit the new parent.');
+
+                apos.afterYield(function() {
+                  reload(function() {
+                    $el.find('.apos-reorganize-progress').fadeOut();
+                  });
+                });
               }
             });
           });
