@@ -514,25 +514,15 @@ function pages(options, callback) {
             {
               name: 'delete-page',
               label: 'Move to Trash'
+            },
+            {
+              name: 'reorganize-page',
+              label: 'Reorganize'
             }
           ];
         }
-        // only admins get the Reorganize menu
-        if (args.contextMenu && req.user && req.user.permissions && req.user.permissions.admin) {
 
-          var reorgItem = _.find(args.contextMenu, function(item) {
-            return item.name === 'reorganize-page';
-          });
-
-          if(!reorgItem) {
-            args.contextMenu.push({
-              name: 'reorganize-page',
-              label: 'Reorganize'
-            });
-          }
-        }
-
-        else if(args.contextMenu && req.user) {
+        else if (args.contextMenu && req.user) {
           // This user does NOT have permission to see reorg,
           // but it might exist already in the contextMenu (why??),
           // so we have to remove it explicitly.
@@ -955,13 +945,14 @@ function pages(options, callback) {
       });
     }
     function permissions(callback) {
-      // You can always move a page into the trash if you have
-      // publish permissions for the page itself. Otherwise you
-      // must have publish permissions for the parent of the page
-      if ((parent.path !== 'home/trash') && (!apos.permissions.can(req, 'publish-page', parent))) {
+      if (!apos.permissions.can(req, 'publish-page', moved)) {
         return callback('forbidden');
       }
-      if (!apos.permissions.can(req, 'publish-page', moved)) {
+      // You can always move a page into the trash. You can
+      // also change the order of subpages if you can
+      // edit the subpage you're moving. Otherwise you
+      // must have edit permissions for the new parent page.
+      if ((oldParent._id !== parent._id) && (parent.path !== 'home/trash') && (!apos.permissions.can(req, 'edit-page', parent))) {
         return callback('forbidden');
       }
       return callback(null);
@@ -1817,12 +1808,15 @@ function pages(options, callback) {
         // reject being displayed by "reorganize", such as blog articles
         // (they are too numerous and are best managed within the blog)
 
-        self.getDescendants(req, page, { reorganize: { $ne: false } }, { depth: 1000, trash: 'any', orphan: 'any' }, function(err, children) {
+        self.getDescendants(req, page, { reorganize: { $ne: false } }, { depth: 1000, trash: 'any', orphan: 'any', permissions: false }, function(err, children) {
           page.children = children;
           // jqtree supports more than one top level node, so we have to pass an array
           data = [ pageToJqtree(page) ];
+          // Prune pages we can't reorganize
+          data = clean(data);
           res.send(data);
         });
+
         // Recursively build a tree in the format jqtree expects
         function pageToJqtree(page) {
           var info = {
@@ -1835,7 +1829,9 @@ function pages(options, callback) {
             // For icons
             type: page.type,
             // Also nice for icons and browser-side decisions about what's draggable where
-            trash: page.trash
+            trash: page.trash,
+            publish: apos.permissions.can(req, 'publish-page', page),
+            edit: apos.permissions.can(req, 'edit-page', page)
           };
           if (page.children && page.children.length) {
             info.children = [];
@@ -1852,6 +1848,36 @@ function pages(options, callback) {
             });
           }
           return info;
+        }
+
+        // If I can't publish at least one of a node's
+        // descendants, prune it from the tree. Returns
+        // a pruned version of the tree
+
+        function clean(nodes) {
+          mark(nodes, []);
+          return prune(nodes);
+          function mark(nodes, ancestors) {
+            _.each(nodes, function(node) {
+              if (node.publish) {
+                node.good = true;
+                _.each(ancestors, function(ancestor) {
+                  ancestor.good = true;
+                });
+              }
+              mark(node.children || [], ancestors.concat([ node ]));
+            });
+          }
+          function prune(nodes) {
+            var newNodes = [];
+            _.each(nodes, function(node) {
+              node.children = prune(node.children || []);
+              if (node.good) {
+                newNodes.push(node);
+              }
+            });
+            return newNodes;
+          }
         }
       });
     });

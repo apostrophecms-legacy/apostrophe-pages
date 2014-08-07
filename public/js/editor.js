@@ -525,9 +525,11 @@ function AposPages() {
               },
               error: function() {
                 // This didn't work, probably because something
-                // else has changed in the page tree. Refreshing
+                // else has changed in the page tree, or because
+                // we're not cool enough to do it. Refreshing
                 // is an appropriate response
                 apos.afterYield(function() { reload(null); });
+                $el.find('.apos-reorganize-progress').fadeOut();
               }
             });
           });
