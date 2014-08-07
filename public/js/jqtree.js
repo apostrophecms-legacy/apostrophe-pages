@@ -2227,7 +2227,7 @@ limitations under the License.
           return _this.updateDropHint();
         });
       };
-      return this.open_folder_timer = setTimeout(openFolder, 500);
+      return this.open_folder_timer = setTimeout(openFolder, 2500);
     };
 
     DragAndDropHandler.prototype.stopOpenFolderTimer = function() {
