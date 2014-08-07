@@ -411,7 +411,7 @@ function AposPages() {
           $tree.tree({
             data: [],
             autoOpen: 0,
-            openFolderDelay: 1500,
+            openFolderDelay: 2500,
             dragAndDrop: true,
             onCanMoveTo: function(moved_node, target_node, position) {
               // Cannot create peers of root

@@ -955,7 +955,10 @@ function pages(options, callback) {
       });
     }
     function permissions(callback) {
-      if (!apos.permissions.can(req, 'publish-page', parent)) {
+      // You can always move a page into the trash if you have
+      // publish permissions for the page itself. Otherwise you
+      // must have publish permissions for the parent of the page
+      if ((parent.path !== 'home/trash') && (!apos.permissions.can(req, 'publish-page', parent))) {
         return callback('forbidden');
       }
       if (!apos.permissions.can(req, 'publish-page', moved)) {
