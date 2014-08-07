@@ -438,12 +438,15 @@ function AposPages() {
               link.append('<i class="icon icon-external-link"></i>');
               $li.find('.jqtree-element .apos-reorganize-controls').append(link);
 
-              link = $('<a class="apos-delete"></a>');
-              link.attr('data-node-id', node.id);
-              link.attr('data-delete', '1');
-              link.attr('href', '#');
-              // link.text('x');
-              link.append('<i class="icon icon-trash"></i>');
+              if (node.publish) {
+                link = $('<a class="apos-delete"></a>');
+                link.attr('data-node-id', node.id);
+                link.attr('data-delete', '1');
+                link.attr('href', '#');
+                // link.text('x');
+                link.append('<i class="icon icon-trash"></i>');
+              }
+
               $li.find('.jqtree-element .apos-reorganize-controls').append(link);
             }
           });
