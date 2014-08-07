@@ -2076,10 +2076,16 @@ function pages(options, callback) {
         _.each(self.revertListeners, function(listener) {
           listener(version);
         });
+
         // Now we can merge the version back onto the page, reverting it.
-        // We don't want a deep merge or appending of arrays, we want simple
-        // replacement of top level properties.
-        _.extend(page, version);
+        // We don't want a deep merge or appending of arrays, we want
+        // simple replacement of top level properties.
+        if (apos.options.workflow) {
+          // Version rollback should be subject to workflow.
+          page.draft = _.clone(version);
+        } else {
+          _.extend(page, version);
+        }
         // Use apos.putPage so that a new version with a new diff is saved
         return apos.putPage(req, page.slug, page, callback);
       }
