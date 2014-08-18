@@ -175,7 +175,7 @@ function pages(options, callback) {
       // TODO: move this to middleware for even more general availability in Apostrophe.
       // See: https://github.com/visionmedia/express/issues/1377
       if (!req.absoluteUrl) {
-        req.absoluteUrl = req.protocol + '://' + req.get('Host') + req.url;
+        req.absoluteUrl = req.protocol + '://' + req.get('Host') + apos.prefix + req.url;
       }
 
       req.extras = {};
@@ -225,7 +225,7 @@ function pages(options, callback) {
           req.remainder = remainder;
 
           if (req.bestPage) {
-            req.bestPage.url = options.root + req.bestPage.slug;
+            req.bestPage.url = apos.prefix + options.root + req.bestPage.slug;
           }
 
           return callback(null);
@@ -650,7 +650,7 @@ function pages(options, callback) {
           }
           pages = results.pages;
           _.each(pages, function(page) {
-            page.url = options.root + page.slug;
+            page.url = apos.prefix + options.root + page.slug;
           });
           return callback(null);
         });
@@ -767,7 +767,7 @@ function pages(options, callback) {
       var pagesByPath = {};
       _.each(pages, function(page) {
         page.children = [];
-        page.url = options.root + page.slug;
+        page.url = apos.prefix + options.root + page.slug;
         pagesByPath[page.path] = page;
         var last = page.path.lastIndexOf('/');
         var parentPath = page.path.substr(0, last);

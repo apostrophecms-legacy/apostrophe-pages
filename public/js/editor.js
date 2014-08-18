@@ -83,12 +83,6 @@ function AposPages() {
     if (!options) {
       options = {};
     }
-    if (!options.root) {
-      options.root = apos.data.aposPages.root;
-    }
-
-    // Allow / or /pages/ to be specified, just quietly fix it
-    options.root = options.root.replace(/\/$/, '');
 
     // Available in other scopes
     aposPages.options = options;
@@ -157,7 +151,7 @@ function AposPages() {
 
         // Get a more robust JSON representation that includes
         // joined objects if any
-        $.getJSON(aposPages.options.root + apos.data.aposPages.page.slug + '?pageInformation=json', function(data) {
+        $.getJSON(apos.data.aposPages.page.slug + '?pageInformation=json', function(data) {
           apos.data.aposPages.page = data;
           defaults = data;
           $el = apos.modalFromTemplate('.apos-edit-page-settings', {
@@ -383,7 +377,7 @@ function AposPages() {
               type: 'POST',
               dataType: 'json',
               success: function(data) {
-                window.location.href = aposPages.options.root + data.slug;
+                apos.redirect(data.slug);
               },
               error: function() {
                 alert('Server error');
@@ -427,7 +421,7 @@ function AposPages() {
               if (node.slug == '/trash') {
                 $li.addClass('apos-trash');
               }
-              $li.find('.jqtree-element').append($('<span class="apos-reorganize-controls"></span>'))
+              $li.find('.jqtree-element').append($('<span class="apos-reorganize-controls"></span>'));
               // Append a link to the jqtree-element div.
               // The link has a url '#node-[id]' and a data property 'node-id'.
               var link = $('<a class="apos-visit" target="_blank"></a>');
@@ -453,9 +447,7 @@ function AposPages() {
           $tree.on('click', '[data-visit]', function() {
             var nodeId = $(this).attr('data-node-id');
             var node = $tree.tree('getNodeById', nodeId);
-            // TODO: this is an assumption about where the root of the page tree
-            // is being served
-            var tab = window.open(node.slug, '_blank');
+            var tab = window.open(apos.data.prefix + node.slug, '_blank');
             tab.focus();
             // window.location.href = ;
             return false;
@@ -547,17 +539,11 @@ function AposPages() {
           var page = apos.data.aposPages.page;
           var _id = page._id;
           $.get('/apos-pages/info', { _id: _id }, function(data) {
-            var newPathname = (apos.data.aposPages.root + data.slug).replace(/^\/\//, '/');
-            if (window.location.pathname === newPathname) {
-              apos.change('tree');
-              return callback();
-            } else {
-              // Navigates away, so don't call the callback
-              window.location.pathname = newPathname;
-            }
+            var newPathname = data.slug.replace(/^\/\//, '/');
+            apos.redirect(newPathname);
           }).error(function() {
             // If the page no longer exists, navigate away to home page
-            window.location.pathname = apos.data.aposPages.root;
+            apos.redirect('/');
           });
         }
       });
@@ -587,7 +573,7 @@ function AposPages() {
           success: function(data) {
             if(data.status === 'ok') {
               alert('Moved to the trash. Select "Reorganize" from the "Page" menu to drag it back out.');
-              window.location.href = aposPages.options.root + data.parent;
+              apos.redirect(data.parent);
             } else {
               alert(data.status);
             }
