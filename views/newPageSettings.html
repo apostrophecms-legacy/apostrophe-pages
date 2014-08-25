@@ -1,22 +1,22 @@
-{% extends 'baseModal.html' %}
-{% include 'uiMacros.html' %}
-{% include 'formMacros.html' %}
-{% include 'permissionsMacros.html' %}
+{%- extends 'baseModal.html' -%}
+{%- include 'uiMacros.html' -%}
+{%- include 'formMacros.html' -%}
+{%- include 'permissionsMacros.html' -%}
 
-{% block modalClass %}
+{%- block modalClass -%}
   apos-new-page-settings apos-ui-modal-no-sidebar apos-ui-modal-has-tabs
-{% endblock%}
+{%- endblock-%}
 
-{% block modalControls %} 
+{%- block modalControls -%} 
   {{ renderProgressBtn({dataAttrs: 'data-save', float: 'right', color: 'base', label: 'Save'}) }}
   {{ renderProgressBtn({dataAttrs: 'data-cancel', float: 'left', label: 'Cancel'}) }}
-{% endblock %}
+{%- endblock -%}
 
-{% block modalLabel %}
+{%- block modalLabel -%}
   {{ __('New Page') }}
-{% endblock %}
+{%- endblock -%}
 
-{% block modalBody %}
+{%- block modalBody -%}
   <form>
     {{ formText('title', 'Title') }}
     {# JS will populate it #}
@@ -35,8 +35,8 @@
           {{ formSelect('type', 'Type', []) }}
           {{ formBoolean('published', 'Published') }}
           {{ formBoolean('notOrphan', 'Show in Navigation') }}
-          {% block slug %}
-          {% endblock %}
+          {%- block slug -%}
+          {%- endblock -%}
           {{ formText('seoDescription', 'SEO Description', { limit: 155 }) }}
           {{ formTags('tags', 'Tags') }}
           <div data-type-details></div>
@@ -47,13 +47,13 @@
         <div class="apos-modal-tab-content">
           {# Must contain the entirety of the permissions editor for js. -Tom #}
           <div data-permissions>
-            {% block permissionsEditor %}
+            {%- block permissionsEditor -%}
               {{ permissionsEditor({ propagate: false, workflow: workflow }) }}
-            {% endblock %}
+            {%- endblock -%}
           </div>
         </div>
       </div>
 
     </div>
   </form>
-{% endblock %}
+{%- endblock -%}

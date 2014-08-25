@@ -108,7 +108,7 @@ function AposPages() {
         $el = apos.modalFromTemplate('.apos-new-page-settings', {
           init: function(callback) {
 
-            populateType(options.pageType);
+            populateType(options.pageType, true);
 
             // Copy parent's published status
             //
@@ -129,7 +129,6 @@ function AposPages() {
                 type = options.pageType;
               }
 
-              // $el.findByName('published').val(apos.data.pages.parent.published)
               // Copy parent permissions
               enablePermissions(apos.data.aposPages.page, true);
               if (options.title) {
@@ -157,7 +156,7 @@ function AposPages() {
           $el = apos.modalFromTemplate('.apos-edit-page-settings', {
             save: save,
             init: function(callback) {
-              populateType(defaults.type);
+              populateType(defaults.type, false);
 
               // TODO: refactor this frequently used dance of boolean values
               // into editor.js or content.js
@@ -216,13 +215,55 @@ function AposPages() {
         return false;
       });
 
-      function populateType(presetType) {
+      function populateType(presetType, insert) {
         var $type = $el.find('[name=type]');
         $type.html('');
         var found = false;
         var $options;
         var type;
-        _.each(apos.data.aposPages.menu || apos.data.aposPages.types, function(type) {
+
+        var choices = apos.data.aposPages.menu || apos.data.aposPages.types;
+
+        // Filter choices via childTypes and descendantTypes
+        // options of our ancestors. These filters are
+        // cumulative
+
+        var parent = insert ? apos.data.aposPages.page : apos.data.aposPages.page.parent;
+        var ancestors = apos.data.aposPages.page.ancestors;
+        if (!insert) {
+          // Make sure we only look at our parent once
+          ancestors = _.clone(ancestors);
+          ancestors.pop();
+        }
+
+        var filter;
+
+        if (parent) {
+          type = self.getType(parent.type);
+          if (type) {
+            filter = type.childTypes || type.descendantTypes;
+            if (filter) {
+              choices = _.filter(choices, function(choice) {
+                return _.contains(filter, choice.name);
+              });
+            }
+          }
+        }
+        if (ancestors.length) {
+          _.each(ancestors, function(ancestor) {
+            type = self.getType(ancestor.type);
+            if (type) {
+              var filter = type.descendantTypes;
+              if (filter) {
+                choices = _.filter(choices, function(choice) {
+                  return _.contains(filter, choice.name);
+                });
+              }
+            }
+          });
+        }
+
+        _.each(choices, function(type) {
           $option = $('<option></option>');
           // The label is wrapped in i18n
           $option.text( __(type.label) );

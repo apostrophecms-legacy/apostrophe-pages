@@ -265,26 +265,23 @@ function pages(options, callback) {
         }
         async.series({
           ancestors: function(callback) {
-            // If you want tabs you also get ancestors, so that
-            // the home page is available (the parent of tabs).
-            if (options.ancestors || options.tabs || true) {
-              var ancestorOptions = options.ancestorOptions ? _.cloneDeep(options.ancestorOptions) : {};
-              if (!ancestorOptions.childrenOptions) {
-                ancestorOptions.childrenOptions = {};
-              }
-              ancestorOptions.childrenOptions.orphan = false;
-
-              return self.getAncestors(req, req.bestPage, options.ancestorCriteria || {}, ancestorOptions || {}, function(err, ancestors) {
-                req.bestPage.ancestors = ancestors;
-                if (ancestors.length) {
-                  // Also set parent as a convenience
-                  req.bestPage.parent = req.bestPage.ancestors.slice(-1)[0];
-                }
-                return callback(err);
-              });
-            } else {
-              return callback(null);
+            // ancestors are always fetched. You need 'em
+            // for tabs, you need 'em for breadcrumb, you
+            // need 'em for the admin UI. You just need 'em.
+            var ancestorOptions = options.ancestorOptions ? _.cloneDeep(options.ancestorOptions) : {};
+            if (!ancestorOptions.childrenOptions) {
+              ancestorOptions.childrenOptions = {};
             }
+            ancestorOptions.childrenOptions.orphan = false;
+
+            return self.getAncestors(req, req.bestPage, options.ancestorCriteria || {}, ancestorOptions || {}, function(err, ancestors) {
+              req.bestPage.ancestors = ancestors;
+              if (ancestors.length) {
+                // Also set parent as a convenience
+                req.bestPage.parent = req.bestPage.ancestors.slice(-1)[0];
+              }
+              return callback(err);
+            });
           },
           peers: function(callback) {
             if (options.peers || true) {
@@ -758,6 +755,7 @@ function pages(options, callback) {
     }
     options.sort = { level: 1, rank: 1 };
 
+    console.log(options);
     apos.get(req, criteria, options, function(err, results) {
       if (err) {
         return callback(err);
@@ -1146,7 +1144,12 @@ function pages(options, callback) {
     }
     self.types.push(type);
 
-    apos.pushGlobalCallWhen('user', 'aposPages.addType(?)', { name: type.name, label: type.label });
+    apos.pushGlobalCallWhen('user', 'aposPages.addType(?)', {
+      name: type.name,
+      label: type.label,
+      childTypes: type.childTypes,
+      descendantTypes: type.descendantTypes
+    });
   };
 
   // Get the index type objects corresponding to an instance or the name of an
@@ -1303,7 +1306,6 @@ function pages(options, callback) {
 
     published = apos.sanitizeBoolean(data.published, true);
     orphan = apos.sanitizeBoolean(data.orphan, false);
-
     tags = apos.sanitizeTags(data.tags);
     type = determineType(data.type);
 
@@ -1660,6 +1662,7 @@ function pages(options, callback) {
       def = 'default';
     }
     type = self.getType(typeName);
+
     if (!type) {
       typeName = def;
       // Really basic fallback for things like the search page
