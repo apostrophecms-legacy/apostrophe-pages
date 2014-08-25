@@ -755,7 +755,6 @@ function pages(options, callback) {
     }
     options.sort = { level: 1, rank: 1 };
 
-    console.log(options);
     apos.get(req, criteria, options, function(err, results) {
       if (err) {
         return callback(err);
