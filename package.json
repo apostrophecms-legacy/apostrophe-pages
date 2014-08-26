@@ -24,7 +24,6 @@
     "lodash": "2.4.x",
     "regexp-quote": "0.0.0",
     "mocha": "~1.8.1",
-    "mongodb": "~1.2.12",
     "extend": "~1.1.3",
     "ent": "0.0.5"
   },
