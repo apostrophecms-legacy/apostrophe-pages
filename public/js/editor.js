@@ -410,20 +410,19 @@ function AposPages() {
           });
         }
 
+        // Use jsonCall so that sparse arrays
+        // (indexed by snippet ID, for instance)
+        // don't turn into flat arrays, also more
+        // efficient generally. -Tom
         function save() {
-          $.ajax(
-            {
-              url: '/apos-pages/' + action,
-              data: data,
-              type: 'POST',
-              dataType: 'json',
-              success: function(data) {
-                apos.redirect(data.slug);
-              },
-              error: function() {
-                alert('Server error');
-                callback('Server error');
-              }
+          $.jsonCall('/apos-pages/' + action,
+            data,
+            function(data) {
+              apos.redirect(data.slug);
+            },
+            function() {
+              alert('Server error');
+              callback('Server error');
             }
           );
         }
