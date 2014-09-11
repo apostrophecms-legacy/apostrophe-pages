@@ -1948,10 +1948,21 @@ function pages(options, callback) {
         limit: apos.sanitizeInteger(data.limit, 50),
         skip: apos.sanitizeInteger(data.skip, 0)
       };
+      var ids;
       if (data.term !== undefined) {
         options.titleSearch = data.term;
       } else if (data.values !== undefined) {
-        criteria._id = { $in: data.values };
+        ids = [];
+        if (data.values.length && (typeof(data.values[0]) === 'object')) {
+          ids = _.pluck(data.values, 'value');
+        } else {
+          ids = data.values;
+        }
+        if (!ids.length) {
+          criteria._id = '_never_happens';
+        } else {
+          criteria._id = { $in: ids };
+        }
       } else {
         // Since arrays in REST queries are ambiguous,
         // treat the absence of either parameter as an
@@ -1982,8 +1993,8 @@ function pages(options, callback) {
         }
         var pages = results.pages;
         // Put the pages in id order, $in does NOT do this
-        if (data.values) {
-          pages = apos.orderById(data.values, pages);
+        if (ids) {
+          pages = apos.orderById(ids, pages);
         }
         return res.send(
           JSON.stringify(_.map(pages, function(snippet) {
