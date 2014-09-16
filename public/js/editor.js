@@ -374,7 +374,6 @@ function AposPages() {
           orphan: !apos.getBoolean($el.findByName('notOrphan')),
           tags: $el.find('[data-name="tags"]').selective('get', { incomplete: true })
         };
-
         apos.permissions.debrief($el.find('[data-permissions]'), data, { propagate: (action === 'edit') });
 
         _.extend(data, { parent: options.parent, originalSlug: options.slug });
@@ -400,7 +399,7 @@ function AposPages() {
           return serialize($el, $el.find('[data-type-details]'), function(err, result) {
             if (err) {
               // Block
-              return;
+              return callback('invalid');
             }
             // Use _.extend to copy top level properties directly and avoid
             // a recursive merge and appending of arrays which would prevent us
