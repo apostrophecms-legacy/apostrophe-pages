@@ -329,7 +329,7 @@ function AposPages() {
           $el.find('[data-type-details]').html('');
         }
         var type = aposPages.getType(typeName);
-        if (type.orphan) {
+        if (type && type.orphan) {
           // Locked for this type
           $el.find('[data-name="notOrphan"]').hide();
         } else {
@@ -396,9 +396,14 @@ function AposPages() {
             };
           }
 
+          // This is a hack to allow serializers to detect
+          // the difference between "New Page" and "Edit Page."
+          // TODO: implement this in a more civilized fashion.
+          $el.data('new', $el.hasClass('apos-new-page-settings'));
           return serialize($el, $el.find('[data-type-details]'), function(err, result) {
             if (err) {
               // Block
+              aposSchemas.scrollToError($el);
               return callback('invalid');
             }
             // Use _.extend to copy top level properties directly and avoid
