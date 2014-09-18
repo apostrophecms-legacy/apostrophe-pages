@@ -1267,24 +1267,47 @@ function pages(options, callback) {
     });
   };
 
-  // Insert a page. The req argument is examined for permissions purposes.
+  // Insert a page. The req argument is examined for
+  // permissions purposes.
   //
-  // The data argument is consulted for title, parent (slug of parent page),
-  // published, tags, type, seoDescription, and pagePermissions fields,
+  // The data argument is consulted for title, parent
+  // (slug of parent page), published, tags, type,
+  // seoDescription, and pagePermissions fields,
   // which are validated here.
   //
   // All other fields are validated via the sanitizer for
-  // the current page type, except that fields with the "type: area" property
-  // may always be introduced as long as they do not override existing properties
-  // that are not areas. This allows the introduction of areas in page templates
-  // without the need for changes in app.js. Such spontaneous areas are still
+  // the specified page type, except that fields with the
+  // "type: area" property may always be introduced as long
+  // as they do not override existing properties
+  // that are not areas. This allows the introduction
+  // of areas in page templates without the need for changes
+  // in app.js. Such spontaneous areas are still
   // sanitized as areas.
   //
-  // You may safely pass in a page object from the browser (req.body), but this
-  // method may also be called to add pages for other reasons. The new page is
+  // You may safely pass in a page object from the browser
+  // (req.body), but this method may also be called to add
+  // pages for other reasons. The new page is
   // the last child of its parent.
+  //
+  // If three arguments are passed, they are req, data
+  // and callback.
+  //
+  // If four arguments are passed, the properties of the
+  // `overrides` object are merged into the page
+  // WITHOUT validation. Use this mechanism to insert a
+  // page of a type that is not available for selection
+  // by the user.
+  //
+  // The callback receives (err, page), where page is
+  // the new page object.
 
-  self.insertPage = function(req, data, callback) {
+  self.insertPage = function(req, data, overrides, callback) {
+
+    if (arguments.length === 3) {
+      callback = overrides;
+      overrides = {};
+    }
+
     var parent;
     var page;
     var parentSlug;
@@ -1372,6 +1395,8 @@ function pages(options, callback) {
 
     function insertPage(callback) {
       page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+
+      extend(true, page, overrides);
 
       return async.series({
         applyPermissions: function(callback) {
@@ -1726,11 +1751,40 @@ function pages(options, callback) {
 
     // Move page to trashcan
     app.post(self._action + '/delete', function(req, res) {
+      var slug = apos.sanitizeString(req.body.slug);
+      return self.moveToTrash(slug, function(err, parentSlug, changed) {
+        if (err) {
+          return res.send(JSON.stringify({
+            status: err
+          }));
+        }
+        // jqtree likes .id, not ._id
+        _.each(changed, function(info) {
+          info.id = info._id;
+        });
+        return res.send(JSON.stringify({
+          status: 'ok',
+          parent: parentSlug,
+          changed: changed
+        }));
+      });
+    });
+
+    // Accepts `req`, `slug` and `callback`.
+    //
+    // Delivers `err`, `parentSlug` (the slug of the page's
+    // former parent), and `changed` (an array of objects with
+    // _id and slug properties, including all subpages that
+    // had to move too).
+
+    self.moveToTrash = function(req, slug, callback) {
       var trash;
       var page;
       var parent;
       var changed = [];
-      async.series([findTrash, findPage, findParent, movePage], respond);
+      return async.series([findTrash, findPage, findParent, movePage], function(err) {
+        return callback(err, parent && parent.slug, changed);
+      });
 
       function findTrash(callback) {
         // Always only one trash page at level 1, so we don't have to
@@ -1746,7 +1800,7 @@ function pages(options, callback) {
 
       function findPage(callback) {
         // Also checks permissions
-        apos.get(req, { slug: req.body.slug }, { editable: true }, function(err, results) {
+        apos.get(req, { slug: slug }, { editable: true }, function(err, results) {
           if (err || (!results.pages.length)) {
             return callback('Page not found');
           }
@@ -1774,24 +1828,7 @@ function pages(options, callback) {
           return callback(null);
         });
       }
-
-      function respond(err) {
-        if (err) {
-          return res.send(JSON.stringify({
-            status: err
-          }));
-        }
-        // jqtree likes .id, not ._id
-        _.each(changed, function(info) {
-          info.id = info._id;
-        });
-        return res.send(JSON.stringify({
-          status: 'ok',
-          parent: parent.slug,
-          changed: changed
-        }));
-      }
-    });
+    };
 
     app.get(self._action + '/get-jqtree', function(req, res) {
       var page;
