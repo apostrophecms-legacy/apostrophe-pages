@@ -2043,14 +2043,21 @@ function pages(options, callback) {
 
     // Return past versions of a page (just the metadata and the diff),
     // rendered via the versions.html template
-    app.get(self._action + '/versions', function(req, res) {
-      var _id = req.query._id;
+    app.post(self._action + '/versions', function(req, res) {
       var page;
       var versions;
-
       function findPage(callback) {
-        return apos.pages.findOne({ _id: _id }, function(err, pageArg) {
+        var criteria = {};
+        if (req.body._id) {
+          criteria._id = self._apos.sanitizeString(req.body._id);
+        } else {
+          criteria.slug = self._apos.sanitizeString(req.body.slug);
+        }
+        return apos.pages.findOne(criteria, function(err, pageArg) {
           page = pageArg;
+          if (!page) {
+            return callback('notfound');
+          }
           return callback(err);
         });
       }
@@ -2063,7 +2070,7 @@ function pages(options, callback) {
       }
 
       function findVersions(callback) {
-        return apos.versions.find({ pageId: _id }).sort({ createdAt: 1 }).toArray(function(err, versionsArg) {
+        return apos.versions.find({ pageId: page._id }).sort({ createdAt: 1 }).toArray(function(err, versionsArg) {
           if (err) {
             return callback(err);
           }
@@ -2089,10 +2096,12 @@ function pages(options, callback) {
 
       function ready(err) {
         if (err) {
-          res.statusCode = 404;
-          return res.send();
+          return res.send({ status: 'error' });
         } else {
-          return res.send(self.render('versions', { versions: versions }));
+          return res.send({ status: 'ok',
+            html: self.render('versions', { versions: versions }),
+            _id: page._id
+          });
         }
       }
 
@@ -2105,8 +2114,8 @@ function pages(options, callback) {
     };
 
     app.post(self._action + '/revert', function(req, res) {
-      var pageId = req.body.page_id;
-      var versionId = req.body.version_id;
+      var pageId = self._apos.sanitizeString(req.body.pageId);
+      var versionId = self._apos.sanitizeString(req.body.versionId);
       var page;
       var version;
 
@@ -2171,10 +2180,9 @@ function pages(options, callback) {
 
       function ready(err) {
         if (err) {
-          res.statusCode = 404;
-          return res.send();
+          return res.send({ status: 'error' });
         } else {
-          return res.send('OK');
+          return res.send({ status: 'ok' });
         }
       }
 
