@@ -391,7 +391,7 @@ function pages(options, callback) {
           }
         });
 
-        return async.parallel(loadList, callback);
+        return async.series(loadList, callback);
       }
 
       function notfound(callback) {
