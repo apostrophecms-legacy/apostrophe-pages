@@ -1752,7 +1752,7 @@ function pages(options, callback) {
     // Move page to trashcan
     app.post(self._action + '/delete', function(req, res) {
       var slug = apos.sanitizeString(req.body.slug);
-      return self.moveToTrash(slug, function(err, parentSlug, changed) {
+      return self.moveToTrash(req, slug, function(err, parentSlug, changed) {
         if (err) {
           return res.send(JSON.stringify({
             status: err
