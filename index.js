@@ -164,6 +164,13 @@ function pages(options, callback) {
         };
       }
 
+      function timeSync(fn, name) {
+        // console.log(name + ' {');
+        var start = now();
+        fn();
+        // console.log('} ' + (now() - start));
+      }
+
       var start = now();
 
       // Let's defer slideshow joins until the last possible minute for
@@ -551,7 +558,11 @@ function pages(options, callback) {
           }
         }
 
-        return res.send(self.renderPage(req, path ? path : req.template, args));
+        var result;
+        timeSync(function() {
+          result = self.renderPage(req, path ? path : req.template, args);
+        }, 'render');
+        return res.send(result);
       }
     };
   };
@@ -1599,8 +1610,7 @@ function pages(options, callback) {
 
     function sendPage(err) {
       if (err) {
-        console.log('the error:');
-        console.log(err);
+        console.error(err);
         res.statusCode = 500;
         return res.send(err);
       }
