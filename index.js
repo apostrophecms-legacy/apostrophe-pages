@@ -14,6 +14,8 @@ function pages(options, callback) {
   var app = options.app;
   var self = this;
   var aposPages = this;
+  var orphan;
+  var type;
   self._action = '/apos-pages';
   self._apos = apos;
 
@@ -1329,12 +1331,16 @@ function pages(options, callback) {
     var published;
     var tags;
     var orphan;
+    var slug;
 
     title = apos.sanitizeString(data.title).trim();
     // Validation is annoying, automatic cleanup is awesome
     if (!title.length) {
       title = 'New Page';
     }
+
+    slug = data.slug || apos.slugify(title);
+
     seoDescription = apos.sanitizeString(data.seoDescription).trim();
 
     published = apos.sanitizeBoolean(data.published, true);
@@ -1405,7 +1411,7 @@ function pages(options, callback) {
     }
 
     function insertPage(callback) {
-      page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+      page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + slug, slug: apos.addSlashIfNeeded(parentSlug) + slug, rank: nextRank };
 
       extend(true, page, overrides);
 
