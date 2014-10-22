@@ -1,3 +1,6 @@
+/*jshint undef:true */
+/*jshint node:true */
+
 var async = require('async');
 var _ = require('lodash');
 var extend = require('extend');
@@ -80,8 +83,8 @@ function pages(options, callback) {
   // than one page partially matches the URL the longest match is provided.
   //
   // Loaders can thus implement multiple-page experiences of almost any complexity
-  // by paying attention to `req.remainder` and choosing to set `req.type` to
-  // something that suits their purposes. If `req.type` is set by a loader it is
+  // by paying attention to `req.remainder` and choosing to set `req.template` to
+  // something that suits their purposes. If `req.template` is set by a loader it is
   // used instead of the original type of the page to select a template. Usually this
   // process begins by examining `req.bestPage.type` to determine whether it is suitable
   // for this treatment (a blog page, for example, might need to implement virtual
@@ -463,11 +466,18 @@ function pages(options, callback) {
           } else if (req.page) {
             // Make sure the type is allowed
             req.template = req.page.type;
-            if (_.some(aposPages.types, function(item) {
-              return item.name === req.type;
-            })) {
-              req.template = 'default';
-            }
+            // This check was coded incorrectly and never
+            // actually flunked a missing template. I have
+            // fixed the check, but I don't want to break 0.5 sites.
+            // TODO: revive this code in 0.6 and test more.
+            //
+            // -Tom
+            //
+            // if (!_.some(aposPages.types, function(item) {
+            //   return item.name === req.template;
+            // })) {
+            //   req.template = 'default';
+            // }
           } else {
             res.statusCode = 404;
             req.template = 'notfound';
@@ -550,11 +560,6 @@ function pages(options, callback) {
           path = __dirname + '/views/' + req.template;
           if (options.templatePath) {
             path = options.templatePath + '/' + req.template;
-          }
-          if (options.templatePaths) {
-            if (options.templatePaths[type]) {
-              path = options.templatePaths[type] + '/' + req.template;
-            }
           }
         }
 
@@ -870,7 +875,7 @@ function pages(options, callback) {
         return callback(null);
       }
       if (movedSlug.charAt(0) !== '/') {
-        return fail();
+        return callback('not a tree page');
       }
       apos.pages.findOne({ slug: movedSlug }, function(err, page) {
         if (!page) {
@@ -892,7 +897,7 @@ function pages(options, callback) {
         return callback(null);
       }
       if (targetSlug.charAt(0) !== '/') {
-        return fail();
+        return callback('not a tree page');
       }
       apos.pages.findOne({ slug: targetSlug }, function(err, page) {
         if (!page) {
@@ -1488,6 +1493,7 @@ function pages(options, callback) {
     var tags;
     var type;
     var seoDescription;
+    var orphan;
 
     title = apos.sanitizeString(req.body.title).trim();
     seoDescription = apos.sanitizeString(req.body.seoDescription).trim();
@@ -1695,7 +1701,7 @@ function pages(options, callback) {
     if (def === undefined) {
       def = 'default';
     }
-    type = self.getType(typeName);
+    var type = self.getType(typeName);
 
     if (!type) {
       typeName = def;
@@ -1822,7 +1828,7 @@ function pages(options, callback) {
       function findParent(callback) {
         self.getParent(req, page, function(err, parentArg) {
           if (err || (!parentArg)) {
-            return respond('Cannot move the home page to the trash');
+            return callback('Cannot move the home page to the trash');
           }
           parent = parentArg;
           return callback(null);
