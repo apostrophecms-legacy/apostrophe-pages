@@ -1334,8 +1334,19 @@ function pages(options, callback) {
     var published;
     var tags;
     var orphan;
+    var slug;
 
     title = apos.sanitizeString(data.title).trim();
+
+    // Our default page settings modal does not offer
+    // a custom slug for a brand new page (we do have it in
+    // the "edit" modal). However let's support this for
+    // other uses of insertPage. -Tom
+
+    if (data.slug) {
+      slug = self.sanitizeSlug(data.slug);
+    }
+
     // Validation is annoying, automatic cleanup is awesome
     if (!title.length) {
       title = 'New Page';
@@ -1410,7 +1421,10 @@ function pages(options, callback) {
     }
 
     function insertPage(callback) {
-      page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: apos.addSlashIfNeeded(parentSlug) + apos.slugify(title), rank: nextRank };
+      if (!slug) {
+        slug = apos.addSlashIfNeeded(parentSlug) + apos.slugify(title);
+      }
+      page = { title: title, seoDescription: seoDescription, published: published, orphan: orphan, tags: tags, type: type.name, level: parent.level + 1, path: parent.path + '/' + apos.slugify(title), slug: slug, rank: nextRank };
 
       extend(true, page, overrides);
 
@@ -1440,6 +1454,27 @@ function pages(options, callback) {
       });
     }
 
+  };
+
+  // Sanitize a page slug. Ensures it is a string,
+  // passes it to slugify, ensures there is a leading slash,
+  // et cetera.
+
+  self.sanitizeSlug = function(slug) {
+    slug = apos.slugify(apos.sanitizeString(slug), { allow: '/' });
+    // Make sure they don't turn it into a virtual page
+    if (!slug.match(/^\//)) {
+      slug = '/' + slug;
+    }
+    // Eliminate double slashes
+    slug = slug.replace(/\/+/g, '/');
+    // Eliminate trailing slashes
+    slug = slug.replace(/\/$/, '');
+    // ... But never eliminate the leading /
+    if (!slug.length) {
+      slug = '/';
+    }
+    return slug;
   };
 
   /**
@@ -1509,22 +1544,8 @@ function pages(options, callback) {
 
     // Allows simple edits of page settings that aren't interested in changing the slug.
     // If you are allowing slug edits you must supply originalSlug.
-    originalSlug = req.body.originalSlug || req.body.slug;
-    slug = req.body.slug;
-
-    slug = apos.slugify(slug, { allow: '/' });
-    // Make sure they don't turn it into a virtual page
-    if (!slug.match(/^\//)) {
-      slug = '/' + slug;
-    }
-    // Eliminate double slashes
-    slug = slug.replace(/\/+/g, '/');
-    // Eliminate trailing slashes
-    slug = slug.replace(/\/$/, '');
-    // ... But never eliminate the leading /
-    if (!slug.length) {
-      slug = '/';
-    }
+    originalSlug = self.sanitizeSlug(req.body.originalSlug || req.body.slug);
+    slug = self.sanitizeSlug(req.body.slug);
 
     async.series([ allowedTags, getPage, permissions, updatePage, redirect, updateDescendants ], sendPage);
 
