@@ -498,6 +498,9 @@ function AposPages() {
           });
 
           $tree.on('click', '[data-delete]', function() {
+            if (!confirm('Are you sure you want to move this page to the trash?')) {
+              return false;
+            }
             var nodeId = $(this).attr('data-node-id');
             var node = $tree.tree('getNodeById', nodeId);
             // Find the trashcan so we can mirror what happened on the server
@@ -605,6 +608,9 @@ function AposPages() {
     });
 
     $('body').on('click', '.apos-delete-page', function() {
+      if (!confirm('Are you sure you want to move this page to the trash?')) {
+        return false;
+      }
       var slug = apos.data.aposPages.page.slug;
       $.ajax(
         {
