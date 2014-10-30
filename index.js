@@ -502,6 +502,12 @@ function pages(options, callback) {
           });
         }
 
+        if (typeof(req.contextMenu) === 'function') {
+          // Context menu can be generated on the fly
+          // by a function
+          req.contextMenu = req.contextMenu(req);
+        }
+
         var args = {
           edit: providePage ? req.bestPage._edit : null,
           slug: providePage ? req.bestPage.slug : null,
