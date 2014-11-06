@@ -176,10 +176,14 @@ function pages(options, callback) {
 
       var start = now();
 
-      // Let's defer slideshow joins until the last possible minute for
-      // all content loaded as part of this request, so we can do it with
-      // one efficient query instead of many queries
-      req.deferredSlideshows = [];
+      // Let's defer various types of widget joins
+      // until the last possible minute for all
+      // content loaded as part of this request, so
+      // we can do it with one efficient query
+      // per type instead of many queries
+
+      req.deferredLoads = {};
+      req.deferredLoaders = {};
 
       // Express doesn't provide the absolute URL the user asked for by default.
       // TODO: move this to middleware for even more general availability in Apostrophe.
@@ -190,7 +194,7 @@ function pages(options, callback) {
 
       req.extras = {};
 
-      return async.series([time(page, 'page'), time(secondChanceLogin, 'secondChanceLogin'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(deferredSlideshows, 'deferred slideshows')], main);
+      return async.series([time(page, 'page'), time(secondChanceLogin, 'secondChanceLogin'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(executeDeferredLoads, 'deferred loads')], main);
 
       function page(callback) {
         // Get content for this page
@@ -419,8 +423,26 @@ function pages(options, callback) {
         }
       }
 
-      function deferredSlideshows(callback) {
-        return apos.joinSlideshows(req, req.deferredSlideshows, callback);
+      function executeDeferredLoads(callback) {
+        // Keep making passes until there are
+        // no more recursive loads to do; loads
+        // may do joins that require more loads, etc.
+          var deferredLoads;
+          var deferredLoaders;
+        return async.whilst(function() {
+          deferredLoads = req.deferredLoads;
+          deferredLoaders = req.deferredLoaders;
+          req.deferredLoads = {};
+          req.deferredLoaders = {};
+          return !_.isEmpty(deferredLoads);
+        }, function(callback) {
+          return async.eachSeries(
+            _.keys(deferredLoads),
+            function(type, callback) {
+              return deferredLoaders[type](req, deferredLoads[type], callback);
+            },
+            callback);
+        }, callback);
       }
 
       function main(err) {
