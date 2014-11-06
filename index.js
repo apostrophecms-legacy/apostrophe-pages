@@ -427,8 +427,8 @@ function pages(options, callback) {
         // Keep making passes until there are
         // no more recursive loads to do; loads
         // may do joins that require more loads, etc.
-          var deferredLoads;
-          var deferredLoaders;
+        var deferredLoads;
+        var deferredLoaders;
         return async.whilst(function() {
           deferredLoads = req.deferredLoads;
           deferredLoaders = req.deferredLoaders;
