@@ -573,6 +573,17 @@ function pages(options, callback) {
           });
         }
 
+        if (args.page) {
+          var type = self.getType(args.page.type);
+          if (type && type.childTypes && (!type.childTypes.length)) {
+            // Snip out add page if no
+            // child page types are allowed
+            args.contextMenu = _.filter(args.contextMenu, function(item) {
+              return item.name !== 'new-page';
+            });
+          }
+        }
+
         _.extend(args, req.extras);
 
         // A simple way to access everything we know about the page
