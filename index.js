@@ -605,6 +605,9 @@ function pages(options, callback) {
         var result;
         timeSync(function() {
           result = self.renderPage(req, path ? path : req.template, args);
+          if (req.statusCode) {
+            res.statusCode = req.statusCode;
+          }
         }, 'render');
         return res.send(result);
       }
