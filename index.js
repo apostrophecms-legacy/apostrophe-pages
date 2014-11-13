@@ -153,8 +153,8 @@ function pages(options, callback) {
       apos.pushLocaleStrings(pageTypesLocaleStrings, req);
 
       function time(fn, name) {
-        req.traceIn(name);
         return function(callback) {
+          req.traceIn(name);
           return fn(function(err) {
             req.traceOut();
             return callback(err);
@@ -252,8 +252,8 @@ function pages(options, callback) {
           return callback(null);
         }
         // Try again with admin privs. If we get a better page,
-        // note the URL in the session and redirect to login
-        return apos.getPage(apos.getTaskReq(), req.slug, function(e, page, bestPage, remainder) {
+        // note the URL in the session and redirect to login.
+        return apos.getPage(apos.getTaskReq(), req.slug, { fields: { slug: 1 } }, function(e, page, bestPage, remainder) {
           if (e) {
             return callback(e);
           }
@@ -270,7 +270,7 @@ function pages(options, callback) {
           return callback(null);
         }
         async.series({
-          ancestors: function(callback) {
+          ancestors: time(function(callback) {
             // ancestors are always fetched. You need 'em
             // for tabs, you need 'em for breadcrumb, you
             // need 'em for the admin UI. You just need 'em.
@@ -288,8 +288,8 @@ function pages(options, callback) {
               }
               return callback(err);
             });
-          },
-          peers: function(callback) {
+          }, 'ancestors'),
+          peers: time(function(callback) {
             if (options.peers || true) {
               var ancestors = req.bestPage.ancestors;
               if (!ancestors.length) {
@@ -314,8 +314,8 @@ function pages(options, callback) {
             } else {
               return callback(null);
             }
-          },
-          descendants: function(callback) {
+          }, 'peers'),
+          descendants: time(function(callback) {
             if (options.descendants || true) {
               var descendantOptions = options.descendantOptions ? _.cloneDeep(options.descendantOptions) : {};
               descendantOptions.orphan = false;
@@ -326,8 +326,8 @@ function pages(options, callback) {
             } else {
               return callback(null);
             }
-          },
-          tabs: function(callback) {
+          }, 'descendants'),
+          tabs: time(function(callback) {
             if (options.tabs || true) {
               var tabOptions = options.tabOptions ? _.cloneDeep(options.tabOptions) : {};
               tabOptions.orphan = false;
@@ -338,7 +338,7 @@ function pages(options, callback) {
             } else {
               return callback(null);
             }
-          }
+          }, 'tabs')
         }, callback);
       }
 
