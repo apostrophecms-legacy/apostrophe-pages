@@ -257,7 +257,7 @@ function pages(options, callback) {
           if (e) {
             return callback(e);
           }
-          if (page || (bestPage && req.bestPage.slug < bestPage.slug)) {
+          if (page || (bestPage && req.bestPage && req.bestPage.slug < bestPage.slug)) {
             req.session.aposAfterLogin = req.url;
             return res.redirect('/login');
           }
