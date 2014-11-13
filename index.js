@@ -152,29 +152,21 @@ function pages(options, callback) {
 
       apos.pushLocaleStrings(pageTypesLocaleStrings, req);
 
-      function now() {
-        return Date.now();
-      }
-
       function time(fn, name) {
+        req.traceIn(name);
         return function(callback) {
-          // console.log(name + ' {');
-          var start = now();
           return fn(function(err) {
-            // console.log('} ' + (now() - start));
+            req.traceOut();
             return callback(err);
           });
         };
       }
 
       function timeSync(fn, name) {
-        // console.log(name + ' {');
-        var start = now();
+        req.traceIn(name);
         fn();
-        // console.log('} ' + (now() - start));
+        req.traceOut();
       }
-
-      var start = now();
 
       // Let's defer various types of widget joins
       // until the last possible minute for all
@@ -609,6 +601,9 @@ function pages(options, callback) {
             res.statusCode = req.statusCode;
           }
         }, 'render');
+
+        self._apos.traceReport(req);
+
         return res.send(result);
       }
     };
