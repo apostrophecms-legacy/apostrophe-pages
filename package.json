@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "apostrophe": "*",
-    "mocha": "*"
+    "mocha": "*",
+    "mongodb": "^1.4.19"
   }
 }

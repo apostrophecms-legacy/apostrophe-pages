@@ -44,7 +44,8 @@ describe('apostrophe-pages', function() {
           request: {},
           locals: {},
           get: function() {},
-          post: function() {}
+          post: function() {},
+          all: function() {}
         }
       }, function(err) {
         assert(!err);
@@ -624,27 +625,21 @@ describe('apostrophe-pages', function() {
 
   describe('add page', function() {
     it('adds a new page beneath /contact called /contact/new-kid', function(done) {
-      var req = {
-        user: {
-          permissions: {
-            admin: true
-          }
-        },
+      var req = apos.getTaskReq();
+      req.body = {
+        parent: '/contact',
+        title: 'New Kid',
+        published: true,
+        tags: [ 'one', 'two' ],
+        type: 'default',
         body: {
-          parent: '/contact',
-          title: 'New Kid',
-          published: true,
-          tags: [ 'one', 'two' ],
-          type: 'default',
-          body: {
-            type: 'area',
-            items: [
-              {
-                type: 'richText',
-                content: 'This is a test'
-              }
-            ]
-          }
+          type: 'area',
+          items: [
+            {
+              type: 'richText',
+              content: 'This is a test'
+            }
+          ]
         }
       };
       var res = {
@@ -674,20 +669,14 @@ describe('apostrophe-pages', function() {
 
   describe('edit page settings', function() {
     it('propagates slug changes to children properly', function(done) {
-      var req = {
-        user: {
-          permissions: {
-            admin: true
-          }
-        },
-        body: {
-          originalSlug: '/contact/about',
-          slug: '/contact/about2',
-          title: 'About2',
-          published: true,
-          tags: [ 'one', 'two' ],
-          type: 'default'
-        }
+      var req = apos.getTaskReq();
+      req.body = {
+        originalSlug: '/contact/about',
+        slug: '/contact/about2',
+        title: 'About2',
+        published: true,
+        tags: [ 'one', 'two' ],
+        type: 'default'
       };
       var res = {
         send: function(data) {
@@ -710,20 +699,14 @@ describe('apostrophe-pages', function() {
       return pages._editRoute(req, res);
     });
    it('retains children when avoiding a duplicate slug error', function(done) {
-      var req = {
-        user: {
-          permissions: {
-            admin: true
-          }
-        },
-        body: {
-          originalSlug: '/contact/about2',
-          slug: '/contact/new-kid',
-          title: 'About2',
-          published: true,
-          tags: [ 'one', 'two' ],
-          type: 'default'
-        }
+      var req = apos.getTaskReq();
+      req.body = {
+        originalSlug: '/contact/about2',
+        slug: '/contact/new-kid',
+        title: 'About2',
+        published: true,
+        tags: [ 'one', 'two' ],
+        type: 'default'
       };
       var res = {
         send: function(data) {

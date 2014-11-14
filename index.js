@@ -911,7 +911,7 @@ function pages(options, callback) {
     var rank;
     var originalPath;
     var originalSlug;
-    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeNewPeers, moveSelf, moveDescendants, trashDescendants ], finish);
+    async.series([getMoved, getTarget, getOldParent, getParent, permissions, nudgeNewPeers, moveSelf, updateRedirects, moveDescendants, trashDescendants ], finish);
     function getMoved(callback) {
       if (moved) {
         return callback(null);
@@ -1067,6 +1067,9 @@ function pages(options, callback) {
         return callback(null);
       });
     }
+    function updateRedirects(callback) {
+      return apos.updateRedirect(originalSlug, moved.slug, callback);
+    }
     function moveDescendants(callback) {
       return self.updateDescendantPathsAndSlugs(moved, originalPath, originalSlug, function(err, changedArg) {
         if (err) {
@@ -1149,14 +1152,24 @@ function pages(options, callback) {
           _id: desc._id,
           slug: newSlug
         });
-        apos.pages.update({ _id: desc._id }, { $set: {
-          // Always matches
-          path: desc.path.replace(matchParentPathPrefix, page.path + '/'),
-          // Might not match, and we don't care (if they edited the slug that far up,
-          // they did so intentionally)
-          slug: newSlug,
-          level: desc.level + (page.level - oldLevel)
-        }}, callback);
+        return async.series({
+          update: function(callback) {
+            return apos.pages.update({ _id: desc._id }, { $set: {
+              // Always matches
+              path: desc.path.replace(matchParentPathPrefix, page.path + '/'),
+              // Might not match, and we don't care (if they edited the slug that far up,
+              // they did so intentionally)
+              slug: newSlug,
+              level: desc.level + (page.level - oldLevel)
+            }}, callback);
+          },
+          redirect: function(callback) {
+            if (desc.slug === newSlug) {
+              return setImmediate(callback);
+            }
+            return apos.updateRedirect(desc.slug, newSlug, callback);
+          }
+        }, callback);
       });
     }, function(err) {
       if (err) {
