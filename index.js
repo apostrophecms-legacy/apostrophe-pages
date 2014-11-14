@@ -186,6 +186,8 @@ function pages(options, callback) {
 
       req.extras = {};
 
+      req.traceIn('TOTAL');
+
       return async.series([time(page, 'page'), time(secondChanceLogin, 'secondChanceLogin'), time(relatives, 'relatives'), time(load, 'load'), time(notfound, 'notfound'), time(executeDeferredLoads, 'deferred loads')], main);
 
       function page(callback) {
@@ -505,6 +507,7 @@ function pages(options, callback) {
         }
 
         if (providePage) {
+          req.traceIn('prune page');
           req.pushData({
             aposPages: {
               // Prune the page back so we're not sending everything
@@ -514,6 +517,7 @@ function pages(options, callback) {
               page: apos.prunePage(req.bestPage)
             }
           });
+          req.traceOut();
         }
 
         if (typeof(req.contextMenu) === 'function') {
@@ -602,6 +606,7 @@ function pages(options, callback) {
           }
         }, 'render');
 
+        req.traceOut();
         self._apos.traceReport(req);
 
         return res.send(result);
