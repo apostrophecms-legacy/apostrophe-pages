@@ -260,7 +260,7 @@ function pages(options, callback) {
             return callback(e);
           }
           if (page || (bestPage && req.bestPage && req.bestPage.slug < bestPage.slug)) {
-            req.session.aposAfterLogin = req.url;
+            res.cookie('aposAfterLogin', req.url);
             return res.redirect('/login');
           }
           return callback(null);
@@ -608,6 +608,16 @@ function pages(options, callback) {
 
         req.traceOut();
         self._apos.traceReport(req);
+
+        if (!req.user) {
+          // Most recent Apostrophe page they saw is a good
+          // candidate to redirect them to if they choose to log in.
+          // However don't make a memo of an ajax load of the third
+          // page of people in the directory, etc.
+          if (options.updateAposAfterLogin && (!req.xhr) && (!req.query.xhr)) {
+            res.cookie('aposAfterLogin', req.url);
+          }
+        }
 
         return res.send(result);
       }
