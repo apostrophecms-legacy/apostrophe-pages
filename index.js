@@ -613,8 +613,9 @@ function pages(options, callback) {
           // Most recent Apostrophe page they saw is a good
           // candidate to redirect them to if they choose to log in.
           // However don't make a memo of an ajax load of the third
-          // page of people in the directory, etc.
-          if (options.updateAposAfterLogin && (!req.xhr) && (!req.query.xhr)) {
+          // page of people in the directory, etc. Don't make a memo
+          // of a 404 or other error page, either
+          if (options.updateAposAfterLogin && ((!res.statusCode) || (res.statusCode === 200)) && (!req.xhr) && (!req.query.xhr)) {
             res.cookie('aposAfterLogin', req.url);
           }
         }
