@@ -8,31 +8,55 @@
 
 .apos-versions {
   list-style: none;
+  font-family: 'Cabin', sans-serif;
+  font-size: 16px;
+
+  .apos-version-emphasize
+  {
+    text-decoration: underline;
+  }
+
   .apos-version {
     padding: 10px 0 10px 0;
     border-bottom: 1px dotted #ccc;
     clear: left;
   }
-  .apos-version:hover {
-    background-color: rgb(240, 240, 240);
-  }
+
   .apos-changes {
     list-style: none;
     float: left;
-    min-width: 500px;
-    width: 500px;
+    min-width: 575px;
+    width: 575px;
     overflow: hidden;
     min-height: 1px;
+    .apos-change
+    {
+      display: none;
+      &.active
+      {
+        display: block;
+      }
+      .apos-change-removed
+      {
+        color: fadeout(@apos-base, 20%);
+        text-decoration: line-through;
+      }
+      .apos-change-added
+      {
+        color: fadeout(@apos-green, 20%);
+      }
+    }
   }
   .apos-author {
-    width: 120px;
+    width: 110px;
     float: left;
     overflow: hidden;
+    text-align: center;
   }
-  .apos-created-at {
-    width: 150px;
+  .apos-revert {
+    width: 80px;
     float: left;
-    overflow: hidden;
+    //overflow: hidden;
   }
 }
 
@@ -132,5 +156,3 @@
 // .apos-page-settings-toggle.apos-active:before {
 //   content: "« "
 // }
-
-

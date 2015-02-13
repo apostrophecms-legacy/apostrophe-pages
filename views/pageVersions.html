@@ -5,7 +5,7 @@
   apos-versions-page apos-ui-modal-no-sidebar apos-ui-modal-has-tabs
 {% endblock%}
 
-{% block modalControls %} 
+{% block modalControls %}
   {{ renderProgressBtn({dataAttrs: 'data-cancel', float: 'right', color: 'base', label: 'Done'}) }}
 {% endblock %}
 
@@ -15,7 +15,7 @@
 
 {% block modalInstructions %}
   <p>
-    {{ __('Click on any version to switch back.') }}
+    {{ __('Click on any version to switch back. Currently, only text changes are noted for each set of changes.') }}
   </p>
 {% endblock %}
 

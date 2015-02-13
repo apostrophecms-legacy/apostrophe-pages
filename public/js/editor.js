@@ -679,6 +679,14 @@ function AposPages() {
           );
         });
 
+        $versions.on('click', '[data-review-changes]', function(e) {
+          e.preventDefault();
+          var $self = $(this);
+          var $changes = $self.closest('.apos-changes').find('.apos-change');
+          $changes.toggleClass('active');
+
+        })
+
         // Load the available versions
         $template = $versions.find('[data-version].apos-template');
         $template.detach();
