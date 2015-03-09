@@ -498,46 +498,7 @@ function AposPages() {
           });
 
           $tree.on('click', '[data-delete]', function() {
-            if (!confirm('Are you sure you want to move this page to the trash?')) {
-              return false;
-            }
-            var nodeId = $(this).attr('data-node-id');
-            var node = $tree.tree('getNodeById', nodeId);
-            // Find the trashcan so we can mirror what happened on the server
-            var trash;
-            _.each($tree.tree('getTree').children[0].children, function(node) {
-              if (node.trash) {
-                trash = node;
-              }
-            });
-            if (!trash) {
-              alert('No trashcan.');
-              return false;
-            }
-            $.ajax({
-              url: '/apos-pages/delete',
-              data: {
-                slug: node.slug
-              },
-              type: 'POST',
-              dataType: 'json',
-              success: function(data) {
-                if (data.status === 'ok') {
-                  $tree.tree('moveNode', node, trash, 'inside');
-                  _.each(data.changed, function(info) {
-                    var node = $tree.tree('getNodeById', info.id);
-                    if (node) {
-                      node.slug = info.slug;
-                    }
-                  });
-                } else {
-                  alert(data.status);
-                }
-              },
-              error: function() {
-                alert('Server error');
-              }
-            });
+            self.reorganizeMovePageToTrash($tree, $(this).attr('data-node-id'));
             return false;
           });
 
@@ -695,6 +656,49 @@ function AposPages() {
       }
     });
   };
+
+  self.reorganizeMovePageToTrash = function($tree, nodeId) {
+    if (!confirm('Are you sure you want to move this page to the trash?')) {
+      return false;
+    }
+    console.log($tree);
+    var node = $tree.tree('getNodeById', nodeId);
+    // Find the trashcan so we can mirror what happened on the server
+    var trash;
+    _.each($tree.tree('getTree').children[0].children, function(node) {
+      if (node.trash) {
+        trash = node;
+      }
+    });
+    if (!trash) {
+      alert('No trashcan.');
+      return false;
+    }
+    $.ajax({
+      url: '/apos-pages/delete',
+      data: {
+        slug: node.slug
+      },
+      type: 'POST',
+      dataType: 'json',
+      success: function(data) {
+        if (data.status === 'ok') {
+          $tree.tree('moveNode', node, trash, 'inside');
+          _.each(data.changed, function(info) {
+            var node = $tree.tree('getNodeById', info.id);
+            if (node) {
+              node.slug = info.slug;
+            }
+          });
+        } else {
+          alert(data.status);
+        }
+      },
+      error: function() {
+        alert('Server error');
+      }
+    });
+  }
 }
 
 // There is only one instance of AposPages. TODO: provide
