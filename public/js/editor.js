@@ -640,6 +640,29 @@ function AposPages() {
           );
         });
 
+        $versions.on('click', '[data-review-changes]', function(e) {
+          e.preventDefault();
+          var $self = $(this);
+          var $changes = $self.closest('.apos-changes').find('.apos-change');
+          $changes.toggleClass('active');
+
+        })
+
+        //A function for loading thumbnails into our UI.
+        function loadThumbnails($el){
+          var $avatars = $el.find('[data-avatar-username]');
+          $avatars.each(function(){
+            var $avatar = $(this);
+            $.get(
+              '/apos-people/thumbnail',
+              {username: $avatar.data('avatar-username')},
+              function(data){
+                $avatar.attr('src', data);
+              }
+            )
+          })
+        }
+
         // Load the available versions
         $template = $versions.find('[data-version].apos-template');
         $template.detach();
@@ -650,6 +673,7 @@ function AposPages() {
           function(data) {
             pageId = data._id;
             $versions.html(data.html);
+            loadThumbnails($versions);
           }
         );
         return callback();
