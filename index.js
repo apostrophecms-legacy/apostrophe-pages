@@ -397,7 +397,7 @@ function pages(options, callback) {
       function notfound(callback) {
         // Implement the automatic redirect mechanism for pages whose
         // slugs have changed, unless an alternate mechanism has been specified
-        if (!req.page) {
+        if ((!req.page) || (req.notfound)) {
           if (options.notfound) {
             return options.notfound(req, function(err) {
               return callback(err);
