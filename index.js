@@ -253,6 +253,7 @@ function pages(options, callback) {
         if (req.page) {
           return callback(null);
         }
+
         // Try again with admin privs. If we get a better page,
         // note the URL in the session and redirect to login.
         return apos.getPage(apos.getTaskReq(), req.slug, { fields: { slug: 1 } }, function(e, page, bestPage, remainder) {
@@ -611,11 +612,18 @@ function pages(options, callback) {
 
         if (!req.user) {
           // Most recent Apostrophe page they saw is a good
-          // candidate to redirect them to if they choose to log in.
-          // However don't make a memo of an ajax load of the third
-          // page of people in the directory, etc. Don't make a memo
-          // of a 404 or other error page, either
-          if (options.updateAposAfterLogin && ((!res.statusCode) || (res.statusCode === 200)) && (!req.xhr) && (!req.query.xhr)) {
+          // candidate to redirect them to if they choose to
+          // log in.
+          //
+          // However several types of URLs are not really of
+          // interest for this purpose:
+          //
+          // * AJAX loads of partial pages
+          // * 404 and other error pages
+          // * Static asset URLs that may or may not
+          // actually exist (file extension is present)
+
+          if (options.updateAposAfterLogin && ((!res.statusCode) || (res.statusCode === 200)) && (!req.xhr) && (!req.query.xhr) && (!(req.url.match(/\.\w+$/)))) {
             res.cookie('aposAfterLogin', req.url);
           }
         }
