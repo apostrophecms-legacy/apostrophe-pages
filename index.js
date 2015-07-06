@@ -184,7 +184,9 @@ function pages(options, callback) {
         req.absoluteUrl = req.protocol + '://' + req.get('Host') + apos.prefix + req.url;
       }
 
-      req.extras = {};
+      // allow earlier middleware to start populating req.extras if
+      // it wants to
+      req.extras = req.extras || {};
 
       req.traceIn('TOTAL');
 
@@ -583,9 +585,9 @@ function pages(options, callback) {
 
         _.extend(args, req.extras);
 
-        // A simple way to access everything we know about the page
-        // in JSON format. Allow this only if we have editing privileges
-        // on the page.
+        // A simple way to access everything we know about
+        // the page in JSON format. Allow this only if we
+        // have editing privileges on the page.
         if ((req.query.pageInformation === 'json') && args.page && (args.page._edit)) {
           return res.send(args.page);
         }
