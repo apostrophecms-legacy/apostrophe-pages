@@ -375,7 +375,7 @@ function pages(options, callback) {
                 // The new syntax for aposArea() requires a more convincing fake page!
                 // Populate slug and permissions correctly
                 req.extras[item] = page ? page : { slug: item };
-                if (!page) {
+                if (!page && req.user && req.user.permissions.admin) {
                   req.extras[item]._edit = true;
                 }
                 return callback(null);
