@@ -1297,7 +1297,37 @@ function pages(options, callback) {
               _criteria
             ]
           };
-          return apos.get(req, criteria, filters, callback);
+          return apos.get(req, criteria, filters, function(err, results) {
+            if (err) {
+              return callback(err);
+            }
+            if (!results.pages) {
+              return callback(null, results);
+            }
+            // Allow getOptions: { children: true } or
+            // getOptions: { children: { depth: 2 } }
+            if (!(filters && filters.children)) {
+              return callback(null, results);
+            }
+            var childrenOptions = {};
+            if (typeof(filters.children) === 'object') {
+              childrenOptions = filters.children;
+            }
+            return async.eachSeries(results.pages, function(item, callback) {
+              return self.getDescendants(req, item, {}, childrenOptions, function(err, children) {
+                if (err) {
+                  return callback(err);
+                }
+                item.children = children;
+                return callback(null);
+              });
+            }, function(err) {
+              if (err) {
+                return callback(err);
+              }
+              return callback(null, results);
+            });
+          });
         }
       };
     }
