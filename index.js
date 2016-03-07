@@ -804,7 +804,9 @@ function pages(options, callback) {
       optionsArg = {};
       criteriaArg = {};
     }
-    var options = {};
+    var options = {
+      sort: {level: 1, rank: 1}
+    };
     extend(true, options, optionsArg);
     _.defaults(options, {
       root: ''
@@ -832,7 +834,6 @@ function pages(options, callback) {
       // subset of them
       options.areas = false;
     }
-    options.sort = { level: 1, rank: 1 };
 
     apos.get(req, criteria, options, function(err, results) {
       if (err) {
