@@ -804,9 +804,6 @@ function pages(options, callback) {
       optionsArg = {};
       criteriaArg = {};
     }
-    var options = {
-      sort: {level: 1, rank: 1}
-    };
     extend(true, options, optionsArg);
     _.defaults(options, {
       root: ''
@@ -818,6 +815,9 @@ function pages(options, callback) {
       depth = 1;
     }
 
+    if (!options.sort) {
+      options.sort = {level: 1, rank: 1};
+    }
     var criteria = {
       $and: [
         {
