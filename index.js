@@ -804,6 +804,7 @@ function pages(options, callback) {
       optionsArg = {};
       criteriaArg = {};
     }
+    var options = {};
     extend(true, options, optionsArg);
     _.defaults(options, {
       root: ''
