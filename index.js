@@ -235,7 +235,7 @@ function pages(options, callback) {
           req.remainder = remainder;
 
           if (req.bestPage) {
-            req.bestPage.url = apos.prefix + options.root + req.bestPage.slug;
+            req.bestPage.url = self._apos.slugToUrl(req.bestPage.slug);
           }
 
           return callback(null);
@@ -726,7 +726,7 @@ function pages(options, callback) {
           }
           pages = results.pages;
           _.each(pages, function(page) {
-            page.url = apos.prefix + options.root + page.slug;
+            page.url = self._apos.slugToUrl(page.slug);
           });
           return callback(null);
         });
@@ -843,7 +843,7 @@ function pages(options, callback) {
       var pagesByPath = {};
       _.each(pages, function(page) {
         page.children = [];
-        page.url = apos.prefix + options.root + page.slug;
+        page.url = self._apos.slugToUrl(page.slug);
         pagesByPath[page.path] = page;
         var last = page.path.lastIndexOf('/');
         var parentPath = page.path.substr(0, last);
