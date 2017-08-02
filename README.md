@@ -1,5 +1,7 @@
 # apostrophe-pages
 
+## DEPRECATED. FOR LEGACY PROJECTS ONLY. Pages are a standfard feature of [Apostrophe 2.x](http://apostrophecms.org/).
+
 `apostrophe-pages` adds page rendering to the [Apostrophe](http://github.com/punkave/apostrophe) content management system. The `apostrophe-pages` module makes it easy to serve pages, fetching the requested page and making its content areas available to your Nunjucks template along with any other attributes of interest.
 
 `apostrophe-pages` also provides a UI for adding pages, deleting pages and changing page settings such as the title. As part of that, `apostrophe-pages` provides functions to fetch ancestor and descendant pages to any desired depth.
