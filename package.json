@@ -14,8 +14,10 @@
     "apostrophe",
     "pages",
     "cms",
-    "content management",
-    "content management system"
+    "content-management",
+    "content-management-system",
+    "apostrophecms",
+    "apostrophe-cms"
   ],
   "author": "P'unk Avenue punkave.com",
   "license": "MIT",
