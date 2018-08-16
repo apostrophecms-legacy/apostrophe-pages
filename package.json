@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/punkave/apostrophe-pages.git"
+    "url": "git://github.com/apostrophecms-legacy/apostrophe-pages.git"
   },
   "keywords": [
     "apostrophe",
