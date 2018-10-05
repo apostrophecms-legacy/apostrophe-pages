@@ -816,6 +816,9 @@ function pages(options, callback) {
       depth = 1;
     }
 
+    if (!options.sort) {
+      options.sort = {level: 1, rank: 1};
+    }
     var criteria = {
       $and: [
         {
@@ -832,7 +835,6 @@ function pages(options, callback) {
       // subset of them
       options.areas = false;
     }
-    options.sort = { level: 1, rank: 1 };
 
     apos.get(req, criteria, options, function(err, results) {
       if (err) {
