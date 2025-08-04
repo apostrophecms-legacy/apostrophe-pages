@@ -1,3 +1,7 @@
+# ⛔️ **DEPRECATED** — do not use for new projects
+
+See [our current docs](https://docs.apostrophecms.org/)
+
 # apostrophe-pages
 
 ## DEPRECATED. FOR LEGACY PROJECTS ONLY. Pages are a standfard feature of [Apostrophe 2.x](http://apostrophecms.org/).
